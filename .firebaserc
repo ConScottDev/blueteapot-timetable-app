@@ -1,0 +1,8 @@
+{
+  "projects": {
+    "default": "bluetapot-scheduling-app",
+    "test": "bluetapot-scheduling-app"
+  },
+  "targets": {},
+  "etags": {}
+}

@@ -1,0 +1,75 @@
+@media print {
+  @page {
+    margin: 0; /* No default margin for the page */
+  }
+
+  .print-page {
+    page-break-after: always; /* Ensure each calendar starts on a new page */
+    /* Ensure consistent margins across all pages */
+  }
+
+  /* Margin styles for specific page classes */
+  .page-1 img,
+  .page-2 img,
+  .page-3 img,
+  .page-4 img,
+  .page-5 img {
+    margin-top: 20px;
+  }
+  .page-0 {
+    margin-top: 12px;
+    margin-left: 12px;
+    margin-right: 12px;
+  }
+  .page-1,
+  .page-2,
+  .page-3,
+  .page-4,
+  .page-5 {
+    margin-left: 12px;
+    margin-right: 12px;
+  }
+  body {
+    margin: 0; /* Remove default margin */
+    padding: 0; /* Remove default padding */
+  }
+
+  .rbc-month-view {
+    width: 100%; /* Full width */
+    margin: 0 auto; /* Center horizontally */
+    margin-bottom: 0; /* Adjust if needed */
+  }
+
+  .rbc-month-row {
+    min-height: 250px !important; /* Ensure consistent row height */
+    height: 250px !important; /* Ensure consistent row height */
+  }
+
+  .rbc-header {
+    font-size: 15px;
+    color: white;
+  }
+
+  .rbc-date-cell {
+    line-height: 1em;
+  }
+
+  .rbc-time-column {
+    width: 100px; /* Adjust width as needed */
+    border-right: 1px solid #ddd;
+    font-size: 16px;
+  }
+
+  .rbc-time-cell {
+    padding: 5px;
+    text-align: center;
+    border-bottom: 1px solid #ddd;
+    font-weight: bold;
+    height: 40px; /* Consistent height */
+  }
+
+  .rbc-month-header .rbc-header {
+    text-align: center;
+    border-bottom: 1px solid #ddd;
+  }
+}

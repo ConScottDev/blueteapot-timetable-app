@@ -3,7 +3,7 @@
     "browser": true,
     "es2021": true
   },
-  "extends": ["plugin:react/recommended", "prettier"],
+  "extends": ["plugin:react/recommended", "prettier", "plugin:react-hooks/recommended"],
   "parserOptions": {
     "ecmaFeatures": {
       "jsx": true
@@ -11,7 +11,7 @@
     "ecmaVersion": 12,
     "sourceType": "module"
   },
-  "plugins": ["react", "prettier"],
+  "plugins": ["react", "prettier", "react-hooks"],
   "rules": {
     "prettier/prettier": [
       "error",
@@ -19,6 +19,8 @@
         "endOfLine": "auto"
       }
     ],
+    "react-hooks/rules-of-hooks": "error",
+    "react-hooks/exhaustive-deps": "warn",
     "react/display-name": "off",
     "default-param-last": "off",
     "react/react-in-jsx-scope": "off",
@@ -29,7 +31,8 @@
         "custom": "ignore"
       }
     ],
-    "react/jsx-curly-spacing": [2, "never"]
+    "react/jsx-curly-spacing": [2, "never"],
+    "react/prop-types": "warn" // Enables prop-types validation
   },
   "settings": { "import/resolver": { "node": { "paths": ["src"] } } }
 }

@@ -1,0 +1,40 @@
+/* production calendar header tweaks */
+.prod-cal .header-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.prod-cal .header-container .MuiIconButton-root {
+  margin-left: auto;
+}
+.prod-cal .rbc-month-row {
+  min-height: 135px !important;
+  height: 135px !important;
+}
+.prod-cal .rbc-day-bg::before {
+  content: unset !important;
+  position: unset !important;
+  top: unset !important;
+  left: unset !important;
+  width: unset !important;
+  height: unset !important;
+  background-color: unset !important;
+  transform: unset !important;
+  pointer-events: unset !important;
+}
+@media print {
+  .prod-cal {
+    margin-top: 12px !important;
+    margin-left: 12px !important;
+    margin-right: 12px !important;
+  }
+  .logo {
+    margin-bottom: 0px !important;
+  }
+}
+@media (max-width: 600px) {
+  .prod-cal .header-container {
+    flex-wrap: wrap;
+  }
+}
