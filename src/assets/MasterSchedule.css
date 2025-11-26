@@ -1,0 +1,286 @@
+/* MasterSchedule.css */
+
+.rbc-row-content:not(.print-view .rbc-row-content) {
+  min-height: 250px !important;
+  height: 250px !important;
+}
+
+.rbc-month-row {
+  min-height: 250px !important;
+  height: 250px !important;
+}
+
+.rbc-calendar {
+  min-height: 100vh !important;
+}
+.print-view .rbc-month-row {
+  min-height: 250px !important;
+}
+.rbc-header {
+  font-size: 14px;
+}
+.rbc-date-cell {
+  line-height: 1em;
+}
+
+.rbc-month-view .rbc-header {
+  background: #00939a;
+  color: #fff;
+}
+
+.rbc-month-view .rbc-date-cell {
+  background-color: #01a5ae;
+  color: #fff;
+}
+
+.rbc-time-column {
+  display: flex;
+  flex-direction: column;
+  width: 100px; /* Adjust width as needed */
+  border-right: 1px solid #ddd;
+  font-size: 14px;
+}
+
+.rbc-time-cell {
+  flex: 1;
+  padding: 5px;
+  text-align: center;
+  border-bottom: 1px solid #ddd;
+  font-weight: bold;
+  height: 40px; /* Ensure consistent height with day cells */
+}
+
+.time-header {
+  width: 83px !important; /* Same width as the time column */
+  text-align: center;
+  border-right: 1px solid #ddd;
+  min-width: 83px;
+  max-width: 83px;
+  background-color: white;
+  visibility: hidden;
+}
+
+.print-view .rbc-month-row {
+  display: flex; /* Use flexbox layout for row */
+  flex-direction: row; /* Align children in a row */
+  min-height: 225px !important; /* Ensure consistent height */
+  height: 225px !important; /* Ensure consistent height */
+}
+
+.print-view .rbc-time-column {
+  display: flex;
+  flex-direction: column; /* Stack time cells vertically */
+  width: 83px; /* Adjust width as needed */
+  border-right: 1px solid #ddd; /* Border to separate columns */
+  font-size: 16px; /* Font size */
+}
+
+.print-view .rbc-time-cell {
+  flex: 1; /* Ensure cells take equal space */
+  padding: 2px 5px;
+  text-align: center;
+  border-bottom: 1px solid #ddd;
+  font-weight: bold;
+  height: 40px; /* Match day cells height */
+  min-height: 89px;
+  align-content: center;
+  font-size: 14px;
+}
+
+.print-view .rbc-week-days {
+  flex: 1; /* Take up remaining space */
+  display: flex; /* Ensure it uses flex layout */
+  flex-direction: column; /* Align week days vertically */
+}
+
+.print-view .rbc-row-content {
+  width: 100%;
+}
+
+.print-view .rbc-row-segment {
+  min-height: 102.5px;
+  max-height: 102.5px;
+  align-content: center;
+}
+
+.print-view .rbc-date-cell {
+  flex: 1; /* Allow cells to take equal space */
+  min-height: 20px; /* Match height with time cells */
+  text-align: right;
+  background-color: #01a5ae;
+}
+
+.rbc-time-column-header {
+  height: 20px;
+  min-height: 20px;
+  line-height: 20px;
+  background-color: #01a5ae; /* Optional: Background color */
+  text-align: center;
+  /* border-bottom: 1px solid #ddd; */
+  font-weight: 500;
+  padding: 0 5px;
+  align-content: center;
+  font-size: 14px;
+  color: white;
+}
+.print-view .rbc-header {
+  background: #00939a;
+  color: white;
+}
+.print-view .rbc-day-bg {
+  position: relative;
+  padding: 10px; /* Adjust padding as needed */
+}
+
+.print-view .rbc-day-bg::before:not(.prod-cal .rbc-day-bg::before) {
+  content: "";
+  position: absolute;
+  top: 24px; /* Start position just below the date cell */
+  left: 0;
+  width: 100%;
+  height: 1px; /* Thickness of the border */
+  background-color: #ddd; /* Color of the border */
+  transform: translateY(97.5px); /* Center the line in the remaining height */
+  pointer-events: none; /* Ensure the border doesn't interfere with interactions */
+}
+.print-view .rbc-date-cell.rbc-off-range,
+.print-view .rbc-date-cell {
+  color: white;
+}
+
+.css-60999s-MuiButtonBase-root-MuiIconButton-root {
+  color: #373a3c !important;
+  background-color: #fff !important;
+  border: 1px solid #ccc !important;
+  /* margin-bottom: 12px !important; */
+}
+
+/* #notes {
+  width: 100%;
+  height: 80px;
+  padding: 10px;
+  font-size: 14px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+} */
+
+.print-view .rbc-day-bg::before {
+  content: "";
+  position: absolute;
+  top: 24px; /* Start position just below the date cell */
+  left: 0;
+  width: 100%;
+  height: 1px; /* Thickness of the border */
+  background-color: #ddd; /* Color of the border */
+  transform: translateY(97.5px); /* Center the line in the remaining height */
+  pointer-events: none; /* Ensure the border doesn't interfere with interactions */
+}
+.rbc-notes-column {
+  width: 162.1px; /* Adjust as needed */
+  border-left: 1px solid #ccc; /* Optional for visual separation */
+}
+.rbc-header.notes-header {
+  width: 162.1px;
+  min-width: 162.1px;
+  max-width: 162.1px;
+}
+.print-view .rbc-today,
+.print-view .rbc-off-range-bg {
+  background-color: #fff;
+}
+
+.print-view .rbc-date-cell {
+  display: flex;
+  justify-content: end;
+  align-items: center;
+}
+
+.custom-print-view {
+  display: flex;
+  flex-direction: column;
+}
+
+.header-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px; /* Adjust as needed */
+}
+
+.title {
+  flex: 1;
+  text-align: center;
+}
+
+.header-container .MuiTextField-root {
+  margin-right: auto; /* Push DatePicker to the left */
+}
+
+.header-container .MuiIconButton-root {
+  margin-left: auto; /* Push ReactToPrint to the right */
+}
+.logo {
+  height: 50px; /* Adjust size as needed */
+  margin-right: auto; /* Push logo to the left */
+  margin-top: 8px;
+}
+.print-view-only .rbc-toolbar {
+  display: none; /* Hide toolbar (and arrows) inside embedded print calendars */
+}
+.main-cal-div {
+  margin: 0px !important;
+}
+
+.note-textarea {
+  padding: 4px;
+}
+.rbc-toolbar {
+  margin-bottom: 16px;
+}
+.production-calendar-active .rbc-toolbar > div:last-child {
+  display: none !important;
+}
+
+@media (max-width: 600px) {
+  .rbc-event {
+    padding: 2px !important;
+    font-size: 12px !important;
+  }
+  .print-view .rbc-time-cell {
+    font-size: 11px;
+    width: 68px;
+  }
+  .print-view .rbc-time-column,
+  .time-header {
+    width: 68px;
+    min-width: 68px;
+  }
+  .print-view {
+    width: 100vw;
+    margin-left: calc(50% - 50vw);
+    margin-right: calc(50% - 50vw);
+  }
+  .rbc-month-view {
+    width: 100vw;
+    margin-left: calc(50% - 50vw);
+    margin-right: calc(50% - 50vw);
+  }
+  .print-view .rbc-date-cell .rbc-button-link {
+    font-size: 11px;
+  }
+  .rbc-notes-column,
+  .rbc-header.notes-header {
+    width: 88px;
+    min-width: 88px;
+    max-width: 88px;
+  }
+  .header-container {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .header-container .title {
+    order: 3;
+    width: 100%;
+    text-align: center;
+  }
+}

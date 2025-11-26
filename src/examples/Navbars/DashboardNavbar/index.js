@@ -12,6 +12,8 @@ Coded by www.creative-tim.com
 
 * The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 */
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "auth/AuthProvider";
 
 import { useState, useEffect } from "react";
 
@@ -27,10 +29,11 @@ import Toolbar from "@mui/material/Toolbar";
 import IconButton from "@mui/material/IconButton";
 import Menu from "@mui/material/Menu";
 import Icon from "@mui/material/Icon";
-
 // Material Dashboard 2 React components
 import MDBox from "components/MDBox";
 import MDInput from "components/MDInput";
+
+import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 
 // Material Dashboard 2 React example components
 import Breadcrumbs from "examples/Breadcrumbs";
@@ -52,6 +55,9 @@ import {
   setMiniSidenav,
   setOpenConfigurator,
 } from "context";
+import MenuOpenIcon from "@mui/icons-material/MenuOpen";
+import MenuIcon from "@mui/icons-material/Menu";
+import LogoutIcon from "@mui/icons-material/Logout";
 
 function DashboardNavbar({ absolute, light, isMini }) {
   const [navbarType, setNavbarType] = useState();
@@ -61,30 +67,44 @@ function DashboardNavbar({ absolute, light, isMini }) {
   const route = useLocation().pathname.split("/").slice(1);
 
   useEffect(() => {
-    // Setting the navbar type
-    if (fixedNavbar) {
-      setNavbarType("sticky");
-    } else {
-      setNavbarType("static");
-    }
+    setNavbarType("static");
+    // if (fixedNavbar) {
+    //   setNavbarType("sticky");
+    // } else {
+    //   setNavbarType("static");
+    // }
 
-    // A function that sets the transparent state of the navbar.
-    function handleTransparentNavbar() {
-      setTransparentNavbar(dispatch, (fixedNavbar && window.scrollY === 0) || !fixedNavbar);
-    }
+    // // A function that sets the transparent state of the navbar.
+    // function handleTransparentNavbar() {
+    //   setTransparentNavbar(dispatch, (fixedNavbar && window.scrollY === 0) || !fixedNavbar);
+    // }
 
-    /** 
-     The event listener that's calling the handleTransparentNavbar function when 
-     scrolling the window.
-    */
-    window.addEventListener("scroll", handleTransparentNavbar);
+    // /**
+    //  The event listener that's calling the handleTransparentNavbar function when
+    //  scrolling the window.
+    // */
+    // window.addEventListener("scroll", handleTransparentNavbar);
 
-    // Call the handleTransparentNavbar function to set the state with the initial value.
-    handleTransparentNavbar();
+    // // Call the handleTransparentNavbar function to set the state with the initial value.
+    // handleTransparentNavbar();
 
-    // Remove event listener on cleanup
-    return () => window.removeEventListener("scroll", handleTransparentNavbar);
+    // // Remove event listener on cleanup
+    // return () => window.removeEventListener("scroll", handleTransparentNavbar);
   }, [dispatch, fixedNavbar]);
+
+  const { signOutNow } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    try {
+      // close the menu if you keep anchor state
+      setOpenMenu(null); // or whatever your state setter is
+      await signOutNow(); // calls Firebase auth.signOut()
+      navigate("/authentication/sign-in", { replace: true });
+    } catch (e) {
+      console.error("Sign-out failed", e);
+    }
+  };
 
   const handleMiniSidenav = () => setMiniSidenav(dispatch, !miniSidenav);
   const handleConfiguratorOpen = () => setOpenConfigurator(dispatch, !openConfigurator);
@@ -104,9 +124,15 @@ function DashboardNavbar({ absolute, light, isMini }) {
       onClose={handleCloseMenu}
       sx={{ mt: 2 }}
     >
-      <NotificationItem icon={<Icon>email</Icon>} title="Check new messages" />
-      <NotificationItem icon={<Icon>podcasts</Icon>} title="Manage Podcast sessions" />
-      <NotificationItem icon={<Icon>shopping_cart</Icon>} title="Payment successfully completed" />
+      <NotificationItem
+        icon={
+          <Icon>
+            <LogoutIcon></LogoutIcon>
+          </Icon>
+        }
+        title="Logout"
+        onClick={handleLogout}
+      />
     </Menu>
   );
 
@@ -130,20 +156,37 @@ function DashboardNavbar({ absolute, light, isMini }) {
       sx={(theme) => navbar(theme, { transparentNavbar, absolute, light, darkMode })}
     >
       <Toolbar sx={(theme) => navbarContainer(theme)}>
-        <MDBox color="inherit" mb={{ xs: 1, md: 0 }} sx={(theme) => navbarRow(theme, { isMini })}>
-          <Breadcrumbs icon="home" title={route[route.length - 1]} route={route} light={light} />
-        </MDBox>
-        {isMini ? null : (
-          <MDBox sx={(theme) => navbarRow(theme, { isMini })}>
-            <MDBox pr={1}>
-              <MDInput label="Search here" />
-            </MDBox>
-            <MDBox color={light ? "white" : "inherit"}>
-              <Link to="/authentication/sign-in/basic">
+        <MDBox
+          color="inherit"
+          sx={(theme) => ({
+            ...navbarRow(theme, { isMini }),
+            flexWrap: "nowrap",
+            gap: theme.spacing(1),
+            alignItems: "flex-end",
+            justifyContent: "space-between",
+            width: "100% !important",
+            [theme.breakpoints.up("xl")]: {
+              justifyContent: "space-between !important",
+              width: "100% !important",
+            },
+          })}
+        >
+          <MDBox flexGrow={1} minWidth={0}>
+            <Breadcrumbs icon="home" title={route[route.length - 1]} route={route} light={light} />
+          </MDBox>
+          {isMini ? null : (
+            <MDBox
+              color={light ? "white" : "inherit"}
+              display="flex"
+              alignItems="center"
+              justifyContent="flex-end"
+              sx={{ ml: { xs: 0, md: "auto" } }}
+            >
+              {/* <Link to="/authentication/sign-in/basic">
                 <IconButton sx={navbarIconButton} size="small" disableRipple>
-                  <Icon sx={iconsStyle}>account_circle</Icon>
+                  <AccountCircleIcon>account_circle</AccountCircleIcon>
                 </IconButton>
-              </Link>
+              </Link> */}
               <IconButton
                 size="small"
                 disableRipple
@@ -152,10 +195,10 @@ function DashboardNavbar({ absolute, light, isMini }) {
                 onClick={handleMiniSidenav}
               >
                 <Icon sx={iconsStyle} fontSize="medium">
-                  {miniSidenav ? "menu_open" : "menu"}
+                  {miniSidenav ? <MenuOpenIcon></MenuOpenIcon> : <MenuIcon></MenuIcon>}
                 </Icon>
               </IconButton>
-              <IconButton
+              {/* <IconButton
                 size="small"
                 disableRipple
                 color="inherit"
@@ -163,7 +206,8 @@ function DashboardNavbar({ absolute, light, isMini }) {
                 onClick={handleConfiguratorOpen}
               >
                 <Icon sx={iconsStyle}>settings</Icon>
-              </IconButton>
+
+              </IconButton> */}
               <IconButton
                 size="small"
                 disableRipple
@@ -174,12 +218,14 @@ function DashboardNavbar({ absolute, light, isMini }) {
                 variant="contained"
                 onClick={handleOpenMenu}
               >
-                <Icon sx={iconsStyle}>notifications</Icon>
+                <Icon sx={iconsStyle}>
+                  <AccountCircleIcon></AccountCircleIcon>
+                </Icon>
               </IconButton>
               {renderMenu()}
             </MDBox>
-          </MDBox>
-        )}
+          )}
+        </MDBox>
       </Toolbar>
     </AppBar>
   );

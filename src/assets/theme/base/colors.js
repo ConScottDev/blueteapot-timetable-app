@@ -21,7 +21,7 @@ Coded by www.creative-tim.com
 
 const colors = {
   background: {
-    default: "#f0f2f5",
+    default: "#f8fafd",
   },
 
   text: {
@@ -45,8 +45,8 @@ const colors = {
   },
 
   primary: {
-    main: "#e91e63",
-    focus: "#e91e63",
+    main: "#00939a",
+    focus: "#01a5ae",
   },
 
   secondary: {
@@ -75,8 +75,8 @@ const colors = {
   },
 
   light: {
-    main: "#f0f2f5",
-    focus: "#f0f2f5",
+    main: "#f8fafd",
+    focus: "#f8fafd",
   },
 
   dark: {
@@ -86,7 +86,7 @@ const colors = {
 
   grey: {
     100: "#f8f9fa",
-    200: "#f0f2f5",
+    200: "#f8fafd",
     300: "#dee2e6",
     400: "#ced4da",
     500: "#adb5bd",
@@ -98,8 +98,8 @@ const colors = {
 
   gradients: {
     primary: {
-      main: "#EC407A",
-      state: "#D81B60",
+      main: "#00939a",
+      state: "#01a5ae",
     },
 
     secondary: {
@@ -202,8 +202,8 @@ const colors = {
 
   badgeColors: {
     primary: {
-      background: "#f8b3ca",
-      text: "#cc084b",
+      background: "#b3e4e6",
+      text: "#006c72",
     },
 
     secondary: {
@@ -243,7 +243,7 @@ const colors = {
   },
 
   coloredShadows: {
-    primary: "#e91e62",
+    primary: "#00939a",
     secondary: "#110e0e",
     info: "#00bbd4",
     success: "#4caf4f",

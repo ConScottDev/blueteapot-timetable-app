@@ -1,0 +1,96 @@
+// firestore.rules (temporary while you build)
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function hasClaim(claim) {
+      return isSignedIn() && request.auth.token[claim] == true;
+    }
+    function isAdmin() {
+      return hasClaim("admin");
+    }
+    function isStaff() {
+      return (
+        isAdmin() ||
+        hasClaim("staff") ||
+        hasClaim("theatre_staff") ||
+        hasClaim("actor_support_staff") ||
+        hasClaim("pas_staff") ||
+        hasClaim("pas_support")
+      );
+    }
+    function isSuperUser() {
+      return isSignedIn() && request.auth.token.email == "ensemble@blueteapot.ie";
+    }
+    function isActor() {
+      return hasClaim("actor");
+    }
+    function isStudent() {
+      return hasClaim("student");
+    }
+
+    function userProfile() {
+      return isSignedIn()
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data
+        : null;
+    }
+
+    function hasUsersRead() {
+      let profile = userProfile();
+      return isSuperUser() || (profile != null && profile.permissions != null && profile.permissions.users != null && profile.permissions.users.read == true);
+    }
+
+    function hasUsersWrite() {
+      let profile = userProfile();
+      return isSuperUser() || (profile != null && profile.permissions != null && profile.permissions.users != null && profile.permissions.users.write == true);
+    }
+
+    function hasStrandWrite(strand) {
+      let profile = userProfile();
+      return profile != null &&
+        profile.permissions != null &&
+        profile.permissions[strand] != null &&
+        profile.permissions[strand].write == true;
+    }
+
+    function canWriteTasks() {
+      return isAdmin() || isStaff() || hasStrandWrite("actors") || hasStrandWrite("students");
+    }
+
+    function canReadTasks() {
+      // Allow readers (actors/students) plus anyone who can write
+      return isActor() || isStudent() || canWriteTasks();
+    }
+
+    // User directory
+    match /users/{uid} {
+      // Read: super-user, delegated read via permissions.users.read, or self
+      allow read: if hasUsersRead() || (isSignedIn() && request.auth.uid == uid);
+      // Write: super-user or delegated write via permissions.users.write
+      allow write: if hasUsersWrite();
+    }
+
+    match /groups/{groupId} {
+      allow read: if isStaff();
+      allow write: if isStaff();
+    }
+
+    match /tasks/{taskId} {
+      allow read: if canReadTasks();
+      allow write: if canWriteTasks();
+    }
+
+    // Task title templates / suggestions
+    match /taskList/{docId} {
+      allow read: if canReadTasks();
+      allow write: if canWriteTasks();
+    }
+
+    // Everything else stays admin-only until explicitly opened
+    match /{document=**} {
+      allow read, write: if isAdmin();
+    }
+  }
+}

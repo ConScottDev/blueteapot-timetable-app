@@ -1,0 +1,13 @@
+.chrome-picker > div:nth-of-type(2) > .flexbox-fix:first-of-type > div:first-of-type > div:first-of-type {
+    width: 16px !important;
+    height: 16px !important;
+}
+.chrome-picker > div:nth-of-type(2) > .flexbox-fix:first-of-type > div:first-of-type {
+    width: 30px !important;
+}
+.chrome-picker > div:nth-of-type(2) > .flexbox-fix:first-of-type{
+    align-items: center;
+}
+.chrome-picker{
+    box-shadow:none !important;
+}

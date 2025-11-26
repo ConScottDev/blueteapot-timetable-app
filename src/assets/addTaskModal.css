@@ -1,0 +1,21 @@
+.rmdp-input {
+  padding: 0.75rem;
+  height: unset;
+}
+.rmdp-container,
+.rmdp-container input {
+  width: 100%;
+}
+.time-radio span {
+  font-weight: 500 !important;
+}
+.css-1g0prys-MuiAutocomplete-root .MuiOutlinedInput-root .MuiAutocomplete-input {
+padding:0px !important;
+}
+.MuiAutocomplete-hasPopupIcon.css-1g0prys-MuiAutocomplete-root .MuiOutlinedInput-root, .MuiAutocomplete-hasClearIcon.css-1g0prys-MuiAutocomplete-root .MuiOutlinedInput-root{
+  padding:0.75rem;
+}
+.time-radio label{
+  display:flex;
+  align-content: center;
+}

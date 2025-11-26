@@ -1,0 +1,200 @@
+const { setGlobalOptions } = require("firebase-functions/v2");
+setGlobalOptions({
+  region: "europe-west1", // use the EU region (works well with eur3)
+  // runtime: { node: 18 }   // optional if you want to pin Node here
+});
+
+// functions/index.js (v2 API)
+const { onDocumentWritten } = require("firebase-functions/v2/firestore");
+const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { initializeApp } = require("firebase-admin/app");
+const { getAuth } = require("firebase-admin/auth");
+const { getFirestore, FieldValue } = require("firebase-admin/firestore");
+const nodemailer = require("nodemailer");
+const logger = require("firebase-functions/logger");
+
+initializeApp();
+
+const DEFAULT_SMTP = {
+  host: "smtp-relay.brevo.com",
+  port: 587,
+  user: "98bb09001@smtp-brevo.com",
+  pass: "Y2fcnO0Pjv4rh3Iz",
+  from: "ensemble@blueteapot.ie",
+  fromName: "Blue Teapot Theatre Company",
+};
+
+const mailConfig = {
+  host: process.env.SMTP_HOST || DEFAULT_SMTP.host,
+  port: Number(process.env.SMTP_PORT || DEFAULT_SMTP.port),
+  user: process.env.SMTP_USER || DEFAULT_SMTP.user,
+  pass: process.env.SMTP_PASS || DEFAULT_SMTP.pass,
+  from:
+    process.env.SMTP_FROM ||
+    process.env.SMTP_SENDER ||
+    process.env.SMTP_USER ||
+    DEFAULT_SMTP.from,
+  fromName: process.env.SMTP_FROM_NAME || DEFAULT_SMTP.fromName || null,
+};
+
+if (Number.isNaN(mailConfig.port)) {
+  mailConfig.port = DEFAULT_SMTP.port;
+}
+
+let mailTransport = null;
+let mailTransportWarned = false;
+
+function getMailTransport() {
+  if (mailTransport) return mailTransport;
+  if (!mailConfig.host || !mailConfig.user || !mailConfig.pass) {
+    if (!mailTransportWarned) {
+      mailTransportWarned = true;
+      logger.warn("notifyTaskParticipants: SMTP credentials missing. Email notifications disabled.");
+    }
+    return null;
+  }
+  mailTransport = nodemailer.createTransport({
+    host: mailConfig.host,
+    port: mailConfig.port,
+    secure: mailConfig.port === 465,
+    auth: {
+      user: mailConfig.user,
+      pass: mailConfig.pass,
+    },
+  });
+  return mailTransport;
+}
+
+function normalizeParticipantIds(raw) {
+  if (!Array.isArray(raw)) return [];
+  const ids = [];
+  for (const entry of raw) {
+    if (typeof entry === "string") {
+      const trimmed = entry.trim();
+      if (trimmed) ids.push(trimmed);
+      continue;
+    }
+    if (entry && typeof entry === "object") {
+      const candidates = [entry.id, entry.uid, entry.userId, entry.value];
+      for (const candidate of candidates) {
+        if (typeof candidate === "string" && candidate.trim()) {
+          ids.push(candidate.trim());
+          break;
+        }
+      }
+    }
+  }
+  return Array.from(new Set(ids));
+}
+
+function inferFirstName(name, fallback) {
+  if (!name) return fallback || "";
+  const trimmed = String(name).trim();
+  if (!trimmed) return fallback || "";
+  const parts = trimmed.split(/\s+/);
+  return parts.length ? parts[0] : trimmed;
+}
+
+function formatDateEuropean(value) {
+  if (!value) return "TBC";
+  if (typeof value === "string") {
+    const match = value.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+    if (match) {
+      const [, year, month, day] = match;
+      const dd = day.padStart(2, "0");
+      const mm = month.padStart(2, "0");
+      return `${dd}-${mm}-${year}`;
+    }
+  }
+  try {
+    const date = new Date(value);
+    if (!Number.isNaN(date.getTime())) {
+      const dd = String(date.getDate()).padStart(2, "0");
+      const mm = String(date.getMonth() + 1).padStart(2, "0");
+      const yyyy = date.getFullYear();
+      return `${dd}-${mm}-${yyyy}`;
+    }
+  } catch (_err) {
+    // ignore
+  }
+  return String(value);
+}
+
+async function fetchParticipantProfiles(ids) {
+  const db = getFirestore();
+  return Promise.all(
+    ids.map(async (id) => {
+      try {
+        const snap = await db.collection("users").doc(id).get();
+        if (!snap.exists) {
+          return { id, missing: true };
+        }
+        const data = snap.data() || {};
+        const displayName = data.displayName || data.name || data.email || id;
+        const firstName = data.firstName || inferFirstName(displayName, displayName);
+        return {
+          id,
+          email: data.email || null,
+          name: displayName,
+          firstName,
+        };
+      } catch (error) {
+        logger.error("notifyTaskParticipants: failed to load participant profile", { id, error });
+        return { id, error: true };
+      }
+    })
+  );
+}
+
+function buildTaskSnapshot(task, nameById) {
+  if (!task) return null;
+  const participantIds = normalizeParticipantIds(task.participants || []);
+  return {
+    title: task.title || "",
+    date: task.date || "",
+    startTime: task.startTime || "",
+    endTime: task.endTime || "",
+    location: task.location || "",
+    tutor: task.tutor || "",
+    color: task.color || "",
+    strands: Array.isArray(task.strands)
+      ? task.strands.map((s) => String(s))
+      : task.strands
+      ? [String(task.strands)]
+      : [],
+    production: task.production === true || task.isProductionEvent === true,
+    participantIds,
+    participantNames: participantIds.map((id) => nameById[id] || id),
+  };
+}
+
+function formatTaskDetails(snapshot) {
+  if (!snapshot) return ["Task details unavailable."];
+  const participants =
+    snapshot.participantNames && snapshot.participantNames.length
+      ? snapshot.participantNames.join(", ")
+      : "TBC";
+  const timeRange =
+    snapshot.startTime && snapshot.endTime
+      ? `${snapshot.startTime} - ${snapshot.endTime}`
+      : snapshot.startTime || snapshot.endTime || "TBC";
+  const formattedDate = formatDateEuropean(snapshot.date);
+  return [
+    `Title: ${snapshot.title || "Untitled task"}`,
+    `Date: ${formattedDate}`,
+    `Time: ${timeRange}`,
+    `Location: ${snapshot.location || "TBC"}`,
+    `Tutor: ${snapshot.tutor || "TBC"}`,
+    `Participants: ${participants}`,
+  ];
+}
+
+function valueForDiff(value) {
+  if (Array.isArray(value)) {
+    return value.map((v) => String(v)).sort().join(", ");
+  }
+  if (typeof value === "boolean") {
+    return value ? "Yes" : "No";
+  }
+  return value == null ? "" : String(value);
+}
