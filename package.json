@@ -1,16 +1,39 @@
 {
-  "name": "Blue Teapot",
-  "version": "2.2.0",
+  "name": "blue-teapot-timetables",
+  "version": "2.3.0",
   "private": true,
   "author": "Conor Scott",
-  "license": "See license in https://www.creative-tim.com/license",
-  "description": "React version of Material Dashboard 2 by Creative Tim",
-  "bugs": {
-    "url": "https://github.com/creativetimofficial/material-dashboard-react/issues"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/creativetimofficial/material-dashboard-react.git"
+  "license": "UNLICENSED",
+  "description": "Desktop and web app for Blue Teapot timetables",
+  "main": "electron-main.js",
+  "build": {
+    "appId": "ie.blueteapot.timetable",
+    "productName": "Blue Teapot Timetables",
+    "directories": {
+      "output": "dist",
+      "buildResources": "buildResources"
+    },
+    "files": [
+      "build/**/*",
+      "electron-main.js"
+    ],
+    "mac": {
+      "target": [
+        "dmg"
+      ]
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "ConScottDev",
+        "repo": "blueteapot-timetable-app"
+      }
+    ]
   },
   "dependencies": {
     "@date-io/dayjs": "^3.0.0",
@@ -55,7 +78,13 @@
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "install:clean": "rd /s /q node_modules && del package-lock.json && npm install && npm start"
+    "install:clean": "rd /s /q node_modules && del package-lock.json && npm install && npm start",
+    "react:start": "react-scripts start",
+    "react:build": "react-scripts build",
+    "electron:dev": "cross-env NODE_ENV=development electron .",
+    "dev": "concurrently \"npm run react:start\" \"npm run electron:dev\"",
+    "build:desktop:local": "npm run react:build && electron-builder --publish=never",
+    "build:desktop:publish": "npm run react:build && electron-builder"
   },
   "eslintConfig": {
     "extends": [
@@ -77,11 +106,6 @@
   },
   "devDependencies": {
     "ajv": "^7.2.4",
-    "concurrently": "^9.2.1",
-    "cross-env": "^7.0.3",
-    "electron": "^39.2.4",
-    "electron-builder": "^26.0.12",
-    "electron-updater": "^6.6.2",
     "eslint": "8.39.0",
     "eslint-config-prettier": "8.8.0",
     "eslint-plugin-import": "2.27.5",
@@ -89,7 +113,12 @@
     "eslint-plugin-prettier": "4.2.1",
     "eslint-plugin-react": "^7.32.2",
     "eslint-plugin-react-hooks": "^4.6.0",
-    "prettier": "2.8.8"
+    "prettier": "2.8.8",
+    "concurrently": "^9.0.0",
+    "cross-env": "^7.0.3",
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3",
+    "electron-updater": "^6.2.1"
   },
   "overrides": {
     "svgo": "3.0.2"
