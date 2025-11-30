@@ -1,41 +1,41 @@
 {
-  "name": "blue-teapot-timetables",
-  "version": "2.3.0",
+  "name": "blue-teapot-scheduling",
+  "version": "2.3.2",
   "private": true,
+  "homepage": "./",
   "author": "Conor Scott",
   "license": "UNLICENSED",
-  "description": "Desktop and web app for Blue Teapot timetables",
+  "description": "Desktop and web app for Blue Teapot scheduling",
   "main": "electron-main.js",
   "build": {
     "appId": "ie.blueteapot.timetable",
-    "productName": "Blue Teapot Timetables",
+    "productName": "Blue Teapot Scheduling",
     "directories": {
       "output": "dist",
       "buildResources": "buildResources"
     },
+    "asar": false,
     "files": [
-      "build/**/*",
-      "electron-main.js"
+      "electron-main.js",
+      "build/**/*"
     ],
-    "mac": {
-      "target": [
-        "dmg"
-      ]
+    "extraResources": [
+      {
+        "from": "build",
+        "to": "build"
+      }
+    ],
+    "extraMetadata": {
+      "main": "electron-main.js"
     },
     "win": {
       "target": [
         "nsis"
       ]
-    },
-    "publish": [
-      {
-        "provider": "github",
-        "owner": "ConScottDev",
-        "repo": "blueteapot-timetable-app"
-      }
-    ]
+    }
   },
   "dependencies": {
+    "electron-updater": "^6.2.1",
     "@date-io/dayjs": "^3.0.0",
     "@emotion/cache": "11.10.8",
     "@emotion/react": "^11.10.8",
@@ -117,8 +117,7 @@
     "concurrently": "^9.0.0",
     "cross-env": "^7.0.3",
     "electron": "^31.0.0",
-    "electron-builder": "^24.13.3",
-    "electron-updater": "^6.2.1"
+    "electron-builder": "^24.13.3"
   },
   "overrides": {
     "svgo": "3.0.2"
