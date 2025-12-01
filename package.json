@@ -1,6 +1,6 @@
 {
   "name": "blue-teapot-scheduling",
-  "version": "2.3.2",
+  "version": "2.3.5",
   "private": true,
   "homepage": "./",
   "author": "Conor Scott",
@@ -9,33 +9,43 @@
   "main": "electron-main.js",
   "build": {
     "appId": "ie.blueteapot.timetable",
-    "productName": "Blue Teapot Scheduling",
+    "productName": "Blue Teapot Schedule",
     "directories": {
       "output": "dist",
       "buildResources": "buildResources"
     },
-    "asar": false,
+    "asar": true,
     "files": [
-      "electron-main.js",
-      "build/**/*"
-    ],
-    "extraResources": [
-      {
-        "from": "build",
-        "to": "build"
-      }
+      "build/**/*",
+      "electron-main.js"
     ],
     "extraMetadata": {
       "main": "electron-main.js"
     },
+    "mac": {
+      "icon": "build/icon.icns",
+      "target": [
+        "dmg"
+      ]
+    },
     "win": {
+      "icon": "build/icon.ico",
       "target": [
         "nsis"
       ]
-    }
+    },
+    "linux": {
+      "icon": "build/icon.png"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "ConScottDev",
+        "repo": "blueteapot-timetable-app"
+      }
+    ]
   },
   "dependencies": {
-    "electron-updater": "^6.2.1",
     "@date-io/dayjs": "^3.0.0",
     "@emotion/cache": "11.10.8",
     "@emotion/react": "^11.10.8",
@@ -47,6 +57,8 @@
     "chroma-js": "2.4.2",
     "date-fns": "^3.6.0",
     "dayjs": "^1.11.12",
+    "electron-log": "^5.4.3",
+    "electron-updater": "^6.6.2",
     "firebase": "^10.12.4",
     "firebase-admin": "^13.5.0",
     "html2canvas": "^1.4.1",
@@ -84,7 +96,7 @@
     "electron:dev": "cross-env NODE_ENV=development electron .",
     "dev": "concurrently \"npm run react:start\" \"npm run electron:dev\"",
     "build:desktop:local": "npm run react:build && electron-builder --publish=never",
-    "build:desktop:publish": "npm run react:build && electron-builder"
+    "build:desktop:publish": "npm run react:build && electron-builder --publish always"
   },
   "eslintConfig": {
     "extends": [
@@ -106,6 +118,10 @@
   },
   "devDependencies": {
     "ajv": "^7.2.4",
+    "concurrently": "^9.0.0",
+    "cross-env": "^7.0.3",
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3",
     "eslint": "8.39.0",
     "eslint-config-prettier": "8.8.0",
     "eslint-plugin-import": "2.27.5",
@@ -113,11 +129,7 @@
     "eslint-plugin-prettier": "4.2.1",
     "eslint-plugin-react": "^7.32.2",
     "eslint-plugin-react-hooks": "^4.6.0",
-    "prettier": "2.8.8",
-    "concurrently": "^9.0.0",
-    "cross-env": "^7.0.3",
-    "electron": "^31.0.0",
-    "electron-builder": "^24.13.3"
+    "prettier": "2.8.8"
   },
   "overrides": {
     "svgo": "3.0.2"
