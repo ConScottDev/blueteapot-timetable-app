@@ -1,6 +1,6 @@
 {
   "name": "blue-teapot-scheduling",
-  "version": "2.3.6",
+  "version": "2.3.7",
   "private": true,
   "homepage": "./",
   "author": "Conor Scott",
@@ -23,19 +23,19 @@
       "main": "electron-main.js"
     },
     "mac": {
-      "icon": "build/icon.icns",
+      "icon": "buildResources/icon.icns",
       "target": [
         "dmg"
       ]
     },
     "win": {
-      "icon": "build/icon.ico",
+      "icon": "buildResources/icon.ico",
       "target": [
         "nsis"
       ]
     },
     "linux": {
-      "icon": "build/icon.png"
+      "icon": "buildResources/icon.png"
     },
     "publish": [
       {
