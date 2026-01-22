@@ -104,7 +104,9 @@
     "electron:dev": "cross-env NODE_ENV=development electron .",
     "dev": "concurrently \"npm run react:start\" \"npm run electron:dev\"",
     "build:desktop:local": "npm run react:build && electron-builder --publish=never",
-    "build:desktop:publish": "npm run react:build && electron-builder --publish always"
+    "build:desktop:publish": "npm run react:build && electron-builder --publish always",
+    "ios:sync": "npm run build && npx cap sync ios",
+    "ios:open": "npx cap open ios"
   },
   "eslintConfig": {
     "extends": [
