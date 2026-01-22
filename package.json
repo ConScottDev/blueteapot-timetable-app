@@ -26,7 +26,11 @@
       "icon": "buildResources/icon.icns",
       "target": [
         "dmg"
-      ]
+      ],
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "buildResources/entitlements.mac.plist",
+      "entitlementsInherit": "buildResources/entitlements.mac.plist"
     },
     "win": {
       "icon": "buildResources/icon.ico",
