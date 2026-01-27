@@ -2,6 +2,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { collection, deleteDoc, doc, getDocs } from "firebase/firestore";
 import { db } from "utils/firebase";
+import { useAuth } from "auth/AuthProvider";
 
 import Grid from "@mui/material/Grid";
 import Card from "@mui/material/Card";
@@ -27,6 +28,38 @@ function UserList() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [roleFilter, setRoleFilter] = useState("all");
+  const { user: currentUser } = useAuth();
+
+  const canReadAll =
+    !!currentUser?.isSuperUser ||
+    (!!currentUser?.permissions?.users?.read &&
+      (currentUser?.permissions?.userActors?.read ?? true) &&
+      (currentUser?.permissions?.userStudents?.read ?? true));
+  const canWriteAll =
+    !!currentUser?.isSuperUser ||
+    (!!currentUser?.permissions?.users?.write &&
+      (currentUser?.permissions?.userActors?.write ?? true) &&
+      (currentUser?.permissions?.userStudents?.write ?? true));
+  const canReadActors = canReadAll || !!currentUser?.permissions?.userActors?.read;
+  const canWriteActors = canWriteAll || !!currentUser?.permissions?.userActors?.write;
+  const canReadStudents = canReadAll || !!currentUser?.permissions?.userStudents?.read;
+  const canWriteStudents = canWriteAll || !!currentUser?.permissions?.userStudents?.write;
+
+  const allowedReadRoles = useMemo(() => {
+    if (canReadAll) return "all";
+    const set = new Set();
+    if (canReadActors) set.add("actor");
+    if (canReadStudents) set.add("student");
+    return set;
+  }, [canReadAll, canReadActors, canReadStudents]);
+
+  const allowedWriteRoles = useMemo(() => {
+    if (canWriteAll) return "all";
+    const set = new Set();
+    if (canWriteActors) set.add("actor");
+    if (canWriteStudents) set.add("student");
+    return set;
+  }, [canWriteAll, canWriteActors, canWriteStudents]);
 
   const fetchUsers = useCallback(async () => {
     const userCollection = collection(db, "users");
@@ -87,34 +120,25 @@ function UserList() {
   }, []);
 
   const roleOptions = useMemo(() => {
-    const staticRoles = [
-      "theatre_staff",
-      "actor_support_staff",
-      "actor",
-      "pas_staff",
-      "pas_support",
-      "student",
-    ];
-    const staticOptions = [
-      { value: "all", label: "All" },
-      ...staticRoles.map((r) => ({ value: r, label: getRoleLabel(r) })),
-    ];
-
-    const excluded = new Set(["all", ...staticRoles]);
-    const dynamicRoleMap = new Map();
-    users.forEach((user) => {
-      const value = getRoleValue(user.role);
-      if (value && !excluded.has(value) && !dynamicRoleMap.has(value)) {
-        dynamicRoleMap.set(value, getRoleLabel(value));
-      }
-    });
-
-    const dynamicOptions = Array.from(dynamicRoleMap, ([value, label]) => ({ value, label })).sort(
-      (a, b) => a.label.localeCompare(b.label)
-    );
-
-    return [...staticOptions, ...dynamicOptions];
-  }, [getRoleLabel, getRoleValue, users]);
+    // Restrict to roles the viewer can read
+    const baseRoles =
+      allowedReadRoles === "all"
+        ? ["theatre_staff", "actor_support_staff", "actor", "pas_staff", "pas_support", "student"]
+        : [];
+    const options = [];
+    if (allowedReadRoles === "all") {
+      options.push({ value: "all", label: "All" });
+      baseRoles.forEach((r) => options.push({ value: r, label: getRoleLabel(r) }));
+      return options;
+    }
+    if (allowedReadRoles instanceof Set) {
+      if (allowedReadRoles.has("actor"))
+        options.push({ value: "actor", label: getRoleLabel("actor") });
+      if (allowedReadRoles.has("student"))
+        options.push({ value: "student", label: getRoleLabel("student") });
+    }
+    return options.length ? options : [{ value: "none", label: "No access" }];
+  }, [allowedReadRoles, getRoleLabel]);
 
   const selectedRoleOption = useMemo(
     () => roleOptions.find((option) => option.value === roleFilter) ?? roleOptions[0] ?? null,
@@ -122,17 +146,32 @@ function UserList() {
   );
 
   const filteredUsers = useMemo(() => {
-    if (roleFilter === "all") return users;
-    return users.filter((user) => getRoleValue(user.role) === roleFilter);
-  }, [getRoleValue, roleFilter, users]);
+    const withinPermission = users.filter((u) => {
+      const value = getRoleValue(u.role);
+      if (allowedReadRoles === "all") return true;
+      return allowedReadRoles instanceof Set && allowedReadRoles.has(value);
+    });
+    if (roleFilter === "all") return withinPermission;
+    return withinPermission.filter((user) => getRoleValue(user.role) === roleFilter);
+  }, [allowedReadRoles, getRoleValue, roleFilter, users]);
 
   useEffect(() => {
     if (roleOptions.length === 0) return;
     const hasCurrent = roleOptions.some((option) => option.value === roleFilter);
     if (!hasCurrent) {
-      setRoleFilter("all");
+      setRoleFilter(roleOptions[0].value);
     }
   }, [roleFilter, roleOptions]);
+
+  const canWriteRole = useCallback(
+    (roleValue) => {
+      if (canWriteAll) return true;
+      if (roleValue === "actor") return canWriteActors;
+      if (roleValue === "student") return canWriteStudents;
+      return false;
+    },
+    [canWriteActors, canWriteAll, canWriteStudents]
+  );
 
   const tableData = useMemo(() => {
     const columns = [
@@ -148,24 +187,28 @@ function UserList() {
       role: getRoleLabel(getRoleValue(u.role)),
       actions: (
         <MDBox sx={{ display: "flex", gap: "12px" }}>
-          <IconButton onClick={() => handleEdit(u)}>
-            <EditIcon fontSize="small" sx={{ color: "#318aec" }} />
-          </IconButton>
-          <IconButton onClick={() => handleDelete(u.id)}>
-            <DeleteIcon fontSize="small" sx={{ color: " #C70000" }} />
-          </IconButton>
+          {canWriteRole(getRoleValue(u.role)) && (
+            <>
+              <IconButton onClick={() => handleEdit(u)}>
+                <EditIcon fontSize="small" sx={{ color: "#318aec" }} />
+              </IconButton>
+              <IconButton onClick={() => handleDelete(u.id)}>
+                <DeleteIcon fontSize="small" sx={{ color: " #C70000" }} />
+              </IconButton>
+            </>
+          )}
         </MDBox>
       ),
     }));
 
     return { columns, rows };
-  }, [filteredUsers, getRoleLabel, getRoleValue, handleDelete, handleEdit]);
+  }, [filteredUsers, getRoleLabel, getRoleValue, handleDelete, handleEdit, canWriteRole]);
 
   const selectStyles = useMemo(
     () => ({
       control: (provided) => ({
         ...provided,
-        minWidth: "220px",
+        width: "100%",
         minHeight: "40px",
         fontSize: "0.95rem",
       }),
@@ -225,22 +268,43 @@ function UserList() {
                 pt={3}
                 px={2}
                 display="flex"
-                justifyContent="space-between"
                 alignItems="center"
+                sx={{
+                  gap: 1.5,
+                  flexWrap: { xs: "wrap", sm: "nowrap" },
+                }}
               >
-                <MDButton variant="gradient" color="dark" onClick={handleAdd}>
+                <MDButton
+                  variant="gradient"
+                  color="dark"
+                  onClick={handleAdd}
+                  disabled={
+                    allowedWriteRoles !== "all" &&
+                    allowedWriteRoles instanceof Set &&
+                    allowedWriteRoles.size === 0
+                  }
+                  sx={{ width: { xs: "100%", sm: "auto" }, flexShrink: 0 }}
+                >
                   <AddIcon sx={{ fontWeight: "bold" }} />
                   &nbsp; Add User
                 </MDButton>
-                <Select
-                  options={roleOptions}
-                  value={selectedRoleOption}
-                  onChange={handleRoleFilterChange}
-                  isSearchable={false}
-                  styles={selectStyles}
-                  components={{ IndicatorSeparator: () => null }}
-                  placeholder="Filter by role"
-                />
+                <MDBox
+                  sx={{
+                    width: { xs: "100%", sm: 220, md: 260 },
+                    flexShrink: 0,
+                    ml: { xs: 0, sm: "auto" },
+                  }}
+                >
+                  <Select
+                    options={roleOptions}
+                    value={selectedRoleOption}
+                    onChange={handleRoleFilterChange}
+                    isSearchable={false}
+                    styles={selectStyles}
+                    components={{ IndicatorSeparator: () => null }}
+                    placeholder="Filter by role"
+                  />
+                </MDBox>
               </MDBox>
 
               <MDBox pt={3}>

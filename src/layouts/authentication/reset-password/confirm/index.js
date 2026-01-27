@@ -84,6 +84,16 @@ export default function ResetPassword() {
             <MDTypography variant="h6" color="error">
               {err}
             </MDTypography>
+            <MDBox mt={2}>
+              <MDButton
+                variant="gradient"
+                color="primary"
+                fullWidth
+                onClick={() => navigate("/authentication/sign-in")}
+              >
+                Back to sign in
+              </MDButton>
+            </MDBox>
           </MDBox>
         </Card>
       </BasicLayout>
@@ -93,12 +103,25 @@ export default function ResetPassword() {
   return (
     <BasicLayout image={bgImage}>
       <Card>
-        <MDBox p={4} component="form" onSubmit={onSubmit}>
-          <MDTypography variant="h5" mb={1}>
-            Set a new password
+        <MDBox
+          variant="gradient"
+          bgColor="primary"
+          borderRadius="lg"
+          coloredShadow="primary"
+          mx={2}
+          mt={-3}
+          p={3}
+          mb={1}
+          textAlign="center"
+        >
+          <MDTypography variant="h4" fontWeight="medium" color="white">
+            Reset password
           </MDTypography>
+        </MDBox>
+
+        <MDBox pt={4} pb={3} px={3} component="form" onSubmit={onSubmit}>
           <MDTypography variant="button" color="text" mb={2} display="block">
-            for <strong>{email}</strong>
+            Set a new password for <strong>{email}</strong>
           </MDTypography>
 
           <MDBox mb={2}>
@@ -138,8 +161,25 @@ export default function ResetPassword() {
           )}
 
           <MDBox mt={3}>
-            <MDButton type="submit" variant="gradient" color="info" fullWidth disabled={submitting}>
+            <MDButton
+              type="submit"
+              variant="gradient"
+              color="primary"
+              fullWidth
+              disabled={submitting}
+            >
               {submitting ? "Updating…" : "Set new password"}
+            </MDButton>
+          </MDBox>
+          <MDBox mt={2}>
+            <MDButton
+              variant="text"
+              color="primary"
+              fullWidth
+              type="button"
+              onClick={() => navigate("/authentication/sign-in")}
+            >
+              Back to sign in
             </MDButton>
           </MDBox>
         </MDBox>

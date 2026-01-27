@@ -1,8 +1,9 @@
 // src/auth/AuthProvider.jsx
-import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { onAuthStateChanged, getIdTokenResult, signOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "utils/firebase"; // adjust alias if not using @
+import { registerDevicePushToken } from "utils/push";
 
 // Updated roles to match new structure
 // Keys are used for Firebase custom claims; labels handled in UI
@@ -44,6 +45,7 @@ const AuthCtx = createContext(null);
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const lastPushUidRef = useRef(null);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (fbUser) => {
@@ -76,11 +78,29 @@ export function AuthProvider({ children }) {
         isSuperUser,
         displayName: profile?.displayName || fbUser.displayName || fbUser.email || "",
         group: claims.group || profile?.group || null, // 'actors' | 'year1' | 'year2' | 'year3'
+        notifications: profile?.notifications || {},
       });
       setLoading(false);
     });
     return () => unsub();
   }, []);
+
+  useEffect(() => {
+    const registerPush = async () => {
+      if (!user) {
+        lastPushUidRef.current = null;
+        return;
+      }
+      if (lastPushUidRef.current === user.uid) return;
+      lastPushUidRef.current = user.uid;
+      try {
+        await registerDevicePushToken(user);
+      } catch (err) {
+        console.warn("Failed to register push token", err);
+      }
+    };
+    registerPush();
+  }, [user]);
 
   const value = useMemo(
     () => ({
@@ -90,8 +110,16 @@ export function AuthProvider({ children }) {
       hasRole: (...r) => !!user && r.some((x) => user.roles.includes(x)),
       canReadStrand: (strand) => !!user?.permissions?.[strand]?.read,
       canWriteStrand: (strand) => !!user?.permissions?.[strand]?.write,
-      canReadUsers: () => !!user?.isSuperUser || !!user?.permissions?.users?.read,
-      canWriteUsers: () => !!user?.isSuperUser || !!user?.permissions?.users?.write,
+      canReadUsers: () =>
+        !!user?.isSuperUser ||
+        !!user?.permissions?.users?.read ||
+        !!user?.permissions?.userActors?.read ||
+        !!user?.permissions?.userStudents?.read,
+      canWriteUsers: () =>
+        !!user?.isSuperUser ||
+        !!user?.permissions?.users?.write ||
+        !!user?.permissions?.userActors?.write ||
+        !!user?.permissions?.userStudents?.write,
     }),
     [user, loading]
   );

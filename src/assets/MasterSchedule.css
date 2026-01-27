@@ -118,7 +118,6 @@
   text-align: center;
   /* border-bottom: 1px solid #ddd; */
   font-weight: 500;
-  padding: 0 5px;
   align-content: center;
   font-size: 14px;
   color: white;
@@ -219,6 +218,18 @@
 .header-container .MuiIconButton-root {
   margin-left: auto; /* Push ReactToPrint to the right */
 }
+.header-container .pages-input {
+  width: 82px;
+  max-width: 96px;
+  min-width: 70px;
+}
+.header-container .start-date-field .MuiInputBase-root,
+.header-container .pages-input .MuiInputBase-root {
+  height: 40px;
+}
+.header-container .export-button {
+  margin-left: 8px;
+}
 .logo {
   height: 50px; /* Adjust size as needed */
   margin-right: auto; /* Push logo to the left */
@@ -241,29 +252,76 @@
   display: none !important;
 }
 
+.print-calendar-wrapper {
+  width: 100%;
+}
+
+.header-container p {
+  font-weight: 600;
+}
+
+@media (max-width: 900px) {
+  .print-calendar-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .print-calendar-wrapper .rbc-month-view {
+    min-width: 900px;
+  }
+}
+
+@media print {
+  .print-calendar-wrapper {
+    overflow: visible !important;
+  }
+
+  .print-calendar-wrapper .rbc-month-view {
+    min-width: auto;
+    width: 100%;
+  }
+}
+
 @media (max-width: 600px) {
+  /* Keep toolbar within content width, only stretch the grid */
+  .main-calendar {
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  .main-calendar .rbc-month-view {
+    width: 100vw;
+    margin-left: calc(50% - 50vw);
+    margin-right: calc(50% - 50vw);
+  }
+
   .rbc-event {
     padding: 2px !important;
     font-size: 12px !important;
   }
   .print-view .rbc-time-cell {
     font-size: 11px;
-    width: 68px;
+    width: 80px;
+    padding-bottom: 0px !important;
+    padding-top: 0px !important;
   }
   .print-view .rbc-time-column,
   .time-header {
-    width: 68px;
-    min-width: 68px;
+    width: 80px !important;
+    min-width: 80px !important;
+    max-width: 80px;
   }
-  .print-view {
-    width: 100vw;
-    margin-left: calc(50% - 50vw);
-    margin-right: calc(50% - 50vw);
+  /* Keep calendar anchored to the left when wrapped in the scroll container */
+  .print-calendar-wrapper .print-view {
+    width: auto;
+    margin-left: 0;
+    margin-right: 0;
   }
-  .rbc-month-view {
-    width: 100vw;
-    margin-left: calc(50% - 50vw);
-    margin-right: calc(50% - 50vw);
+  .print-calendar-wrapper .rbc-month-view {
+    width: auto;
+    margin-left: 0;
+    margin-right: 0;
   }
   .print-view .rbc-date-cell .rbc-button-link {
     font-size: 11px;
@@ -275,12 +333,56 @@
     max-width: 88px;
   }
   .header-container {
-    flex-wrap: wrap;
-    gap: 10px;
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(88px, 0.75fr) auto;
+    grid-template-rows: auto auto;
+    column-gap: 8px;
+    row-gap: 6px;
+    align-items: center;
   }
   .header-container .title {
-    order: 3;
-    width: 100%;
+    grid-column: 1 / 4;
+    grid-row: 2 / 3;
+    width: auto;
     text-align: center;
+    margin-top: 12px;
+  }
+  .header-container .start-date-field {
+    grid-column: 1 / 2;
+    grid-row: 1 / 2;
+    min-width: 0;
+    width: 100%;
+  }
+  .header-container .pages-input {
+    grid-column: 2 / 3;
+    grid-row: 1 / 2;
+    min-width: 88px;
+    margin-right: 0;
+    width: 100%;
+    max-width: none;
+  }
+  .header-container .export-button {
+    grid-column: 3 / 4;
+    grid-row: 1 / 2;
+    justify-self: end;
+    margin-left: 0;
+  }
+  .rbc-time-column-header {
+    height: 20px;
+    min-height: 20px;
+    line-height: 20px;
+  }
+  .print-view .rbc-date-cell {
+    min-height: 20px;
+  }
+
+  .production-calendar-active .header-container {
+    display: block;
+    text-align: end;
+    margin-top: -46px;
+  }
+  .rbc-month-row {
+    min-height: 160px !important;
+    height: 160px !important;
   }
 }

@@ -18,6 +18,8 @@ import RadioGroup from "@mui/material/RadioGroup";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import { useTheme } from "@mui/material/styles";
 import { TimePicker } from "@mui/x-date-pickers/TimePicker";
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import dayjs from "dayjs";
 import { Autocomplete, Checkbox, TextareaAutosize, TextField } from "@mui/material";
 import DatePicker from "react-multi-date-picker";
@@ -126,6 +128,8 @@ const AddTaskModal = ({ onClose, scheduleStrand }) => {
   const [participants, setParticipants] = useState([]);
   const [actors, setActors] = useState([]);
   const [students, setStudents] = useState([]);
+  const [actorSupport, setActorSupport] = useState([]);
+  const [pasSupport, setPasSupport] = useState([]);
   const [presetTime, setPresetTime] = useState("");
   const [isProductionEvent, setIsProductionEvent] = useState(false);
   const [color, setColor] = useState(colorOptions[0].hex); // Default color
@@ -198,10 +202,20 @@ const AddTaskModal = ({ onClose, scheduleStrand }) => {
     setIsColorPickerOpen(false);
   };
 
-  const participantOptions = useMemo(
-    () => (scheduleStrand === "actor" ? actors : students),
-    [actors, scheduleStrand, students]
-  );
+  const participantOptions = useMemo(() => {
+    const base = scheduleStrand === "actor" ? actors : students;
+    const support = scheduleStrand === "actor" ? actorSupport : pasSupport;
+
+    // de-dupe by id while preserving order (actors/students first, then support)
+    const seen = new Set();
+    const merged = [];
+    [...base, ...support].forEach((user) => {
+      if (!user?.id || seen.has(user.id)) return;
+      seen.add(user.id);
+      merged.push(user);
+    });
+    return merged;
+  }, [actors, actorSupport, pasSupport, scheduleStrand, students]);
 
   const participantsById = useMemo(
     () => Object.fromEntries(participantOptions.map((p) => [p.id, p])),
@@ -297,16 +311,22 @@ const AddTaskModal = ({ onClose, scheduleStrand }) => {
 
     const loadParticipants = async () => {
       try {
-        const [actorList, studentList] = await Promise.all([
+        const [actorList, studentList, actorSupportList, pasSupportList] = await Promise.all([
           fetchParticipantsByRole("actor"),
           fetchParticipantsByRole("student"),
+          fetchParticipantsByRole("actor_support_staff"),
+          fetchParticipantsByRole("pas_support"),
         ]);
         setActors(actorList);
         setStudents(studentList);
+        setActorSupport(actorSupportList);
+        setPasSupport(pasSupportList);
       } catch (err) {
         console.error("Error fetching users for participants:", err);
         setActors([]);
         setStudents([]);
+        setActorSupport([]);
+        setPasSupport([]);
       }
     };
 
@@ -375,6 +395,9 @@ const AddTaskModal = ({ onClose, scheduleStrand }) => {
     } else if (selectedTime === "afternoon") {
       setStartTime(dayjs().hour(13).minute(30));
       setEndTime(dayjs().hour(15).minute(0));
+    } else if (selectedTime === "allDay") {
+      setStartTime(dayjs().hour(10).minute(0));
+      setEndTime(dayjs().hour(15).minute(0));
     }
   };
 
@@ -405,67 +428,26 @@ const AddTaskModal = ({ onClose, scheduleStrand }) => {
         // Convert the custom date object to a string in YYYY-MM-DD format
         const formattedDate = dayjs(date).format("YYYY-MM-DD");
 
-        if (presetTime === "allDay") {
-          // Create two separate events if "All Day" is selected
+        const startTimeFormatted = dayjs(startTime).format("HH:mm");
+        const endTimeFormatted = dayjs(endTime).format("HH:mm");
 
-          // Morning event
-          const morningTaskData = {
-            title: taskName,
-            title_lc: taskName.toLowerCase(),
-            strands,
-            location,
-            tutor,
-            date: formattedDate,
-            startTime: "10:00", // Fixed morning time
-            endTime: "12:30",
-            participants: yearDerivedParticipants,
-            color,
-            ...(isProductionEvent && { production: true }),
-            ...(scheduleStrand === "student" ? { studentYears } : {}),
-          };
-          await addDoc(collection(db, "tasks"), morningTaskData);
+        const taskData = {
+          title: taskName,
+          title_lc: taskName.toLowerCase(), // lowercase for indexing/search
+          strands,
+          location,
+          tutor,
+          date: formattedDate,
+          startTime: presetTime === "allDay" ? "10:00" : startTimeFormatted,
+          endTime: presetTime === "allDay" ? "15:00" : endTimeFormatted,
+          participants: yearDerivedParticipants,
+          color,
+          ...(isProductionEvent && { production: true }),
+          ...(scheduleStrand === "student" ? { studentYears } : {}),
+        };
 
-          // Afternoon event
-          const afternoonTaskData = {
-            title: taskName,
-            title_lc: taskName.toLowerCase(),
-            strands,
-            location,
-            tutor,
-            date: formattedDate,
-            startTime: "13:30", // Fixed afternoon time
-            endTime: "15:00",
-            participants: yearDerivedParticipants,
-            color,
-            ...(isProductionEvent && { production: true }),
-            ...(scheduleStrand === "student" ? { studentYears } : {}),
-          };
-          await addDoc(collection(db, "tasks"), afternoonTaskData);
-
-          console.log("Two 'All Day' events added for date: ", formattedDate);
-        } else {
-          // Single event logic
-          const startTimeFormatted = dayjs(startTime).format("HH:mm");
-          const endTimeFormatted = dayjs(endTime).format("HH:mm");
-
-          const taskData = {
-            title: taskName,
-            title_lc: taskName.toLowerCase(), // <— add this
-            strands,
-            location,
-            tutor,
-            date: formattedDate,
-            startTime: startTimeFormatted,
-            endTime: endTimeFormatted,
-            participants: yearDerivedParticipants,
-            color,
-            ...(isProductionEvent && { production: true }),
-            ...(scheduleStrand === "student" ? { studentYears } : {}),
-          };
-
-          await addDoc(collection(db, "tasks"), taskData);
-          console.log("Task added for date: ", formattedDate);
-        }
+        await addDoc(collection(db, "tasks"), taskData);
+        console.log("Task added for date: ", formattedDate);
       }
       rememberLightweight("loc", location);
       rememberLightweight("tutor", tutor);
@@ -529,363 +511,373 @@ const AddTaskModal = ({ onClose, scheduleStrand }) => {
   return (
     <ModalOverlay style={{ zIndex: 1200 }}>
       <ModalContainer>
-        <MDBox
-          mb={3}
-          py={2}
-          px={2}
-          variant="gradient"
-          bgColor="#01a5ae"
-          borderRadius="lg"
-          coloredShadow="info"
-          display="flex"
-          alignItems="center"
-          justifyContent="space-between"
-        >
-          <MDTypography variant="h6" color="white">
-            {modalTitle}
-          </MDTypography>
-          <CloseButton onClick={onClose} aria-label="Close">
-            ×
-          </CloseButton>
-        </MDBox>
+        <LocalizationProvider dateAdapter={AdapterDayjs}>
+          <MDBox
+            mb={3}
+            py={2}
+            px={2}
+            variant="gradient"
+            bgColor="#01a5ae"
+            borderRadius="lg"
+            coloredShadow="info"
+            display="flex"
+            alignItems="center"
+            justifyContent="space-between"
+          >
+            <MDTypography variant="h6" color="white">
+              {modalTitle}
+            </MDTypography>
+            <CloseButton onClick={onClose} aria-label="Close">
+              ×
+            </CloseButton>
+          </MDBox>
 
-        <form onSubmit={handleSubmit}>
-          <FormField>
-            <Autocomplete
-              sx={{ padding: "0px !important" }}
-              freeSolo
-              options={titleSuggestions}
-              // handle objects AND plain strings (freeSolo can pass strings)
-              getOptionLabel={(opt) => (typeof opt === "string" ? opt : opt?.title ?? "")}
-              isOptionEqualToValue={(opt, val) =>
-                opt?.id && val?.id
-                  ? opt.id === val.id
-                  : opt?.title && val?.title
-                  ? opt.title === val.title
-                  : String(opt) === String(val)
-              }
-              inputValue={taskName}
-              onInputChange={(e, v) => setTaskName(v)}
-              onChange={(e, newValue) => {
-                // newValue can be: object (picked option) OR string (typed & enter)
-                if (!newValue) {
-                  setTaskName("");
-                  setLocation("");
-                  setTutor("");
-                  return;
+          <form onSubmit={handleSubmit}>
+            <FormField>
+              <Autocomplete
+                sx={{ padding: "0px !important" }}
+                freeSolo
+                options={titleSuggestions}
+                // handle objects AND plain strings (freeSolo can pass strings)
+                getOptionLabel={(opt) => (typeof opt === "string" ? opt : opt?.title ?? "")}
+                isOptionEqualToValue={(opt, val) =>
+                  opt?.id && val?.id
+                    ? opt.id === val.id
+                    : opt?.title && val?.title
+                    ? opt.title === val.title
+                    : String(opt) === String(val)
                 }
-                if (typeof newValue === "string") {
-                  setTaskName(newValue);
-                  return;
-                }
-                setTaskName(newValue.title || "");
-                setLocation(newValue.location || "");
-                setTutor(newValue.tutor || "");
-                setColor(newValue.color || color);
-                // ensure the created task will include the current schedule strand
-                const merged = Array.from(new Set([...(newValue.strands || []), scheduleStrand]));
-                setStrands(merged);
-              }}
-              // Let Firestore results be the source of truth
-              filterOptions={(x) => x}
-              renderInput={(params) => (
-                <MDInput {...params} label="Event Name" fullWidth required />
-              )}
-            />
-          </FormField>
-          <FormField>
-            <Autocomplete
-              freeSolo
-              options={locationOptions}
-              inputValue={location}
-              onInputChange={(e, v) => setLocation(v)}
-              renderInput={(params) => <MDInput {...params} label="Location" fullWidth />}
-            />
-          </FormField>
-          <FormField>
-            <Autocomplete
-              freeSolo
-              options={tutorOptions}
-              inputValue={tutor}
-              onInputChange={(e, v) => setTutor(v)}
-              renderInput={(params) => <MDInput {...params} label="Tutor" fullWidth />}
-            />
-          </FormField>
-          <FormField>
-            <DatePicker
-              multiple
-              value={dates}
-              onChange={setDates}
-              format="DD/MM/YYYY" // Desired date format
-              placeholder="Select Dates"
-              fullWidth
-              render={<CustomMultipleInput />}
-              required
-            />
-          </FormField>
+                inputValue={taskName}
+                onInputChange={(e, v) => setTaskName(v)}
+                onChange={(e, newValue) => {
+                  // newValue can be: object (picked option) OR string (typed & enter)
+                  if (!newValue) {
+                    setTaskName("");
+                    setLocation("");
+                    setTutor("");
+                    return;
+                  }
+                  if (typeof newValue === "string") {
+                    setTaskName(newValue);
+                    return;
+                  }
+                  setTaskName(newValue.title || "");
+                  setLocation(newValue.location || "");
+                  setTutor(newValue.tutor || "");
+                  setColor(newValue.color || color);
+                  // ensure the created task will include the current schedule strand
+                  const merged = Array.from(new Set([...(newValue.strands || []), scheduleStrand]));
+                  setStrands(merged);
+                }}
+                // Let Firestore results be the source of truth
+                filterOptions={(x) => x}
+                renderInput={(params) => (
+                  <MDInput {...params} label="Event Name" fullWidth required />
+                )}
+              />
+            </FormField>
+            <FormField>
+              <Autocomplete
+                freeSolo
+                options={locationOptions}
+                inputValue={location}
+                onInputChange={(e, v) => setLocation(v)}
+                renderInput={(params) => <MDInput {...params} label="Location" fullWidth />}
+              />
+            </FormField>
+            <FormField>
+              <Autocomplete
+                freeSolo
+                options={tutorOptions}
+                inputValue={tutor}
+                onInputChange={(e, v) => setTutor(v)}
+                renderInput={(params) => <MDInput {...params} label="Tutor" fullWidth />}
+              />
+            </FormField>
+            <FormField>
+              <DatePicker
+                multiple
+                value={dates}
+                onChange={setDates}
+                format="DD/MM/YYYY" // Desired date format
+                placeholder="Select Dates"
+                fullWidth
+                render={<CustomMultipleInput />}
+                required
+              />
+            </FormField>
 
-          {scheduleStrand === "student" && (
+            {scheduleStrand === "student" && (
+              <FormField>
+                <FormControl fullWidth>
+                  <InputLabel id="student-years-label">Student Year(s)</InputLabel>
+                  <Select
+                    labelId="student-years-label"
+                    id="student-years-select"
+                    multiple
+                    value={studentYears}
+                    onChange={(event) => {
+                      const {
+                        target: { value },
+                      } = event;
+                      const next = typeof value === "string" ? value.split(",") : value;
+                      setStudentYears(next.map((v) => Number(v)));
+                    }}
+                    input={<OutlinedInput label="Student Year(s)" />}
+                    renderValue={(selected) => (
+                      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                        {selected.map((year) => (
+                          <Chip key={year} label={`Year ${year}`} size="small" />
+                        ))}
+                      </Box>
+                    )}
+                    MenuProps={MenuProps}
+                    sx={{
+                      padding: "0.75rem",
+                      "& .MuiInputBase-root": { padding: "0.75rem" },
+                    }}
+                  >
+                    {yearOptions.map((year) => (
+                      <CustomMenuItem key={year} value={year}>
+                        Year {year}
+                      </CustomMenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </FormField>
+            )}
+
+            <FormField>
+              <FormControl component="fieldset" style={{ width: "100%" }}>
+                <MDTypography variant="h6" style={{ fontSize: "14px", marginBottom: "8px" }}>
+                  Preset Time Slots
+                </MDTypography>
+                <RadioGroup
+                  style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}
+                  className="time-radio"
+                  row
+                  value={presetTime}
+                  onChange={handlePresetTimeChange}
+                >
+                  <FormControlLabel
+                    value="morning"
+                    control={<Radio />}
+                    label={
+                      <MDTypography variant="body2" style={{ fontSize: "14px" }}>
+                        10:00am
+                        <br /> 12:30pm
+                      </MDTypography>
+                    }
+                  />
+                  <FormControlLabel
+                    value="afternoon"
+                    control={<Radio />}
+                    label={
+                      <MDTypography variant="body2" style={{ fontSize: "14px" }}>
+                        1:30pm
+                        <br /> 3:00pm
+                      </MDTypography>
+                    }
+                  />
+                  <FormControlLabel
+                    value="allDay"
+                    control={<Radio />}
+                    label={
+                      <MDTypography variant="body2" style={{ fontSize: "14px" }}>
+                        All Day
+                      </MDTypography>
+                    }
+                  />
+                </RadioGroup>
+              </FormControl>
+            </FormField>
+            <TimePickerContainer>
+              <FormField>
+                <TimePicker
+                  label="Start Time"
+                  value={startTime}
+                  onChange={(newValue) => setStartTime(newValue)}
+                  ampm={false}
+                  renderInput={(params) => <MDInput {...params} fullWidth required />}
+                />
+              </FormField>
+              <FormField>
+                <TimePicker
+                  label="End Time"
+                  value={endTime}
+                  ampm={false}
+                  onChange={(newValue) => setEndTime(newValue)}
+                  renderInput={(params) => <MDInput {...params} fullWidth required />}
+                />
+              </FormField>
+            </TimePickerContainer>
             <FormField>
               <FormControl fullWidth>
-                <InputLabel id="student-years-label">Student Year(s)</InputLabel>
+                <InputLabel id="participants-label">Participants</InputLabel>
                 <Select
-                  labelId="student-years-label"
-                  id="student-years-select"
+                  labelId="participants-label"
+                  id="participants-select"
                   multiple
-                  value={studentYears}
-                  onChange={(event) => {
-                    const {
-                      target: { value },
-                    } = event;
-                    const next = typeof value === "string" ? value.split(",") : value;
-                    setStudentYears(next.map((v) => Number(v)));
-                  }}
-                  input={<OutlinedInput label="Student Year(s)" />}
+                  required
+                  value={participants} // array of user IDs (uids)
+                  onChange={handleParticipantsChange}
+                  input={<OutlinedInput label="Participants" />}
+                  MenuProps={MenuProps}
                   renderValue={(selected) => (
                     <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
-                      {selected.map((year) => (
-                        <Chip key={year} label={`Year ${year}`} size="small" />
+                      {selected.map((id) => (
+                        <Chip key={id} label={participantsById[id]?.name || id} size="small" />
                       ))}
                     </Box>
                   )}
-                  MenuProps={MenuProps}
                   sx={{
                     padding: "0.75rem",
                     "& .MuiInputBase-root": { padding: "0.75rem" },
                   }}
                 >
-                  {yearOptions.map((year) => (
-                    <CustomMenuItem key={year} value={year}>
-                      Year {year}
+                  {participantOptions.map((user) => (
+                    <CustomMenuItem
+                      key={user.id}
+                      value={user.id}
+                      style={{
+                        fontWeight:
+                          participants.indexOf(user.id) !== -1
+                            ? theme.typography.fontWeightMedium
+                            : theme.typography.fontWeightRegular,
+                      }}
+                    >
+                      {user.name}
                     </CustomMenuItem>
                   ))}
                 </Select>
               </FormControl>
             </FormField>
-          )}
-
-          <FormField>
-            <FormControl component="fieldset" style={{ width: "100%" }}>
-              <MDTypography variant="h6" style={{ fontSize: "14px", marginBottom: "8px" }}>
-                Preset Time Slots
-              </MDTypography>
-              <RadioGroup
-                style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}
-                className="time-radio"
-                row
-                value={presetTime}
-                onChange={handlePresetTimeChange}
-              >
-                <FormControlLabel
-                  value="morning"
-                  control={<Radio />}
-                  label={
-                    <MDTypography variant="body2" style={{ fontSize: "14px" }}>
-                      10:00am
-                      <br /> 12:30pm
-                    </MDTypography>
-                  }
-                />
-                <FormControlLabel
-                  value="afternoon"
-                  control={<Radio />}
-                  label={
-                    <MDTypography variant="body2" style={{ fontSize: "14px" }}>
-                      1:30pm
-                      <br /> 3:00pm
-                    </MDTypography>
-                  }
-                />
-                <FormControlLabel
-                  value="allDay"
-                  control={<Radio />}
-                  label={
-                    <MDTypography variant="body2" style={{ fontSize: "14px" }}>
-                      All Day
-                    </MDTypography>
-                  }
-                />
-              </RadioGroup>
-            </FormControl>
-          </FormField>
-          <TimePickerContainer>
             <FormField>
-              <TimePicker
-                label="Start Time"
-                value={startTime}
-                onChange={(newValue) => setStartTime(newValue)}
-                ampm={false}
-                renderInput={(params) => <MDInput {...params} fullWidth required />}
-              />
-            </FormField>
-            <FormField>
-              <TimePicker
-                label="End Time"
-                value={endTime}
-                ampm={false}
-                onChange={(newValue) => setEndTime(newValue)}
-                renderInput={(params) => <MDInput {...params} fullWidth required />}
-              />
-            </FormField>
-          </TimePickerContainer>
-          <FormField>
-            <FormControl fullWidth>
-              <InputLabel id="participants-label">Participants</InputLabel>
-              <Select
-                labelId="participants-label"
-                id="participants-select"
-                multiple
-                required
-                value={participants} // array of user IDs (uids)
-                onChange={handleParticipantsChange}
-                input={<OutlinedInput label="Participants" />}
-                MenuProps={MenuProps}
-                renderValue={(selected) => (
-                  <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
-                    {selected.map((id) => (
-                      <Chip key={id} label={participantsById[id]?.name || id} size="small" />
-                    ))}
-                  </Box>
-                )}
-                sx={{
-                  padding: "0.75rem",
-                  "& .MuiInputBase-root": { padding: "0.75rem" },
-                }}
-              >
-                {participantOptions.map((user) => (
-                  <CustomMenuItem
-                    key={user.id}
-                    value={user.id}
-                    style={{
-                      fontWeight:
-                        participants.indexOf(user.id) !== -1
-                          ? theme.typography.fontWeightMedium
-                          : theme.typography.fontWeightRegular,
-                    }}
-                  >
-                    {user.name}
-                  </CustomMenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </FormField>
-          <FormField>
-            <FormControl fullWidth>
-              <MDTypography variant="caption" sx={{ mb: 0.5, display: "block" }}>
-                Event Colour
-              </MDTypography>
+              <FormControl fullWidth>
+                <MDTypography variant="caption" sx={{ mb: 0.5, display: "block" }}>
+                  Event Colour
+                </MDTypography>
 
-              <Chip
-                label="Color"
-                onClick={(e) => setAnchorEl(e.currentTarget)}
-                sx={{
-                  width: "fit-content",
-                  pl: 1,
-                  "& .MuiChip-avatar": {
-                    width: 14,
-                    height: 14,
-                    bgcolor: color,
-                    borderRadius: "50%",
-                  },
-                }}
-                avatar={<Box />}
-                variant="outlined"
-              />
+                <Chip
+                  label="Color"
+                  onClick={(e) => setAnchorEl(e.currentTarget)}
+                  sx={{
+                    width: "fit-content",
+                    pl: 1,
+                    "& .MuiChip-avatar": {
+                      width: 14,
+                      height: 14,
+                      bgcolor: color,
+                      borderRadius: "50%",
+                    },
+                  }}
+                  avatar={<Box />}
+                  variant="outlined"
+                />
 
-              <Popover
-                open={Boolean(anchorEl)}
-                anchorEl={anchorEl}
-                onClose={() => setAnchorEl(null)}
-                anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
-                transformOrigin={{ vertical: "top", horizontal: "left" }}
-                PaperProps={{ sx: { p: 2 } }}
-              >
-                <Stack spacing={1.5} sx={{ minWidth: 220 }}>
-                  {recentColors.length > 0 && (
-                    <>
-                      <MDTypography variant="caption" sx={{ color: "text.secondary" }}>
-                        Recent
-                      </MDTypography>
-                      <Box sx={{ display: "grid", gridTemplateColumns: "repeat(6, 24px)", gap: 1 }}>
-                        {recentColors.map((c) => (
-                          <ColorSwatch
-                            key={c}
-                            hex={c}
-                            onClick={() => {
-                              handleColorChange(c);
-                              setAnchorEl(null);
-                            }}
-                          />
-                        ))}
-                      </Box>
-                    </>
-                  )}
+                <Popover
+                  open={Boolean(anchorEl)}
+                  anchorEl={anchorEl}
+                  onClose={() => setAnchorEl(null)}
+                  anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+                  transformOrigin={{ vertical: "top", horizontal: "left" }}
+                  PaperProps={{ sx: { p: 2, bgcolor: "#fff" } }}
+                >
+                  <Stack spacing={1.5} sx={{ minWidth: 220 }}>
+                    {recentColors.length > 0 && (
+                      <>
+                        <MDTypography variant="caption" sx={{ color: "text.secondary" }}>
+                          Recent
+                        </MDTypography>
+                        <Box
+                          sx={{ display: "grid", gridTemplateColumns: "repeat(6, 24px)", gap: 1 }}
+                        >
+                          {recentColors.map((c) => (
+                            <ColorSwatch
+                              key={c}
+                              hex={c}
+                              onClick={() => {
+                                handleColorChange(c);
+                                setAnchorEl(null);
+                              }}
+                            />
+                          ))}
+                        </Box>
+                      </>
+                    )}
 
-                  <MDTypography
-                    variant="caption"
-                    sx={{ color: "text.secondary", mt: recentColors.length ? 1 : 0 }}
-                  >
-                    Palette
-                  </MDTypography>
-                  <Box sx={{ display: "grid", gridTemplateColumns: "repeat(6, 24px)", gap: 1 }}>
-                    {colorOptions.map((o) => (
-                      <ColorSwatch
-                        key={o.hex}
-                        hex={o.hex}
-                        title={o.name}
-                        onClick={() => {
-                          handleColorChange(o.hex);
-                          setAnchorEl(null);
-                        }}
-                      />
-                    ))}
-                  </Box>
-
-                  <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 1 }}>
-                    <Button
-                      size="small"
-                      onClick={() => {
-                        setAnchorEl(null);
-                        handleOpenColorPicker(); // opens your existing modal
-                      }}
+                    <MDTypography
+                      variant="caption"
+                      sx={{ color: "text.secondary", mt: recentColors.length ? 1 : 0 }}
                     >
-                      Custom…
-                    </Button>
-                  </Box>
-                </Stack>
-              </Popover>
-            </FormControl>
+                      Palette
+                    </MDTypography>
+                    <Box sx={{ display: "grid", gridTemplateColumns: "repeat(6, 24px)", gap: 1 }}>
+                      {colorOptions.map((o) => (
+                        <ColorSwatch
+                          key={o.hex}
+                          hex={o.hex}
+                          title={o.name}
+                          onClick={() => {
+                            handleColorChange(o.hex);
+                            setAnchorEl(null);
+                          }}
+                        />
+                      ))}
+                    </Box>
 
-            <ColorPickerModal
-              open={isColorPickerOpen}
-              onClose={handleCloseColorPicker}
-              selectedColor={color}
-              onSelectColor={handleColorChange}
-            />
-          </FormField>
+                    <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 1 }}>
+                      <Button
+                        size="small"
+                        onClick={() => {
+                          setAnchorEl(null);
+                          handleOpenColorPicker(); // opens your existing modal
+                        }}
+                      >
+                        Custom…
+                      </Button>
+                    </Box>
+                  </Stack>
+                </Popover>
+              </FormControl>
 
-          {scheduleStrand === "actor" && (
-            <FormField>
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={isProductionEvent}
-                    onChange={(e) => setIsProductionEvent(e.target.checked)}
-                  />
-                }
-                label="Production Event"
+              <ColorPickerModal
+                open={isColorPickerOpen}
+                onClose={handleCloseColorPicker}
+                selectedColor={color}
+                onSelectColor={handleColorChange}
               />
             </FormField>
-          )}
-          <MDBox display="flex" justifyContent="space-between" alignItems="center">
-            <MDButton type="submit" variant="contained" color="info" size="small">
-              Add Task
-            </MDButton>
-            <MDButton type="button" onClick={onClose} variant="outlined" color="info" size="small">
-              Close
-            </MDButton>
-          </MDBox>
-        </form>
+
+            {scheduleStrand === "actor" && (
+              <FormField>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={isProductionEvent}
+                      onChange={(e) => setIsProductionEvent(e.target.checked)}
+                    />
+                  }
+                  label="Production Event"
+                />
+              </FormField>
+            )}
+            <MDBox display="flex" justifyContent="space-between" alignItems="center">
+              <MDButton type="submit" variant="contained" color="info" size="small">
+                Add Task
+              </MDButton>
+              <MDButton
+                type="button"
+                onClick={onClose}
+                variant="outlined"
+                color="info"
+                size="small"
+              >
+                Close
+              </MDButton>
+            </MDBox>
+          </form>
+        </LocalizationProvider>
       </ModalContainer>
     </ModalOverlay>
   );

@@ -18,3 +18,30 @@ export const resolveDefaultRouteForRoles = (roles = []) => {
 };
 
 export const STAFF_REDIRECT_ROLES = STAFF_ROLES;
+
+const canReadStrandFromPermissions = (permissions, strand) => !!permissions?.[strand]?.read;
+const canWriteStrandFromPermissions = (permissions, strand) => !!permissions?.[strand]?.write;
+
+export const resolveDefaultRouteForAccess = (roles = [], permissions = null) => {
+  const canReadActors = canReadStrandFromPermissions(permissions, "actors");
+  const canWriteActors = canWriteStrandFromPermissions(permissions, "actors");
+  const canReadStudents = canReadStrandFromPermissions(permissions, "students");
+  const canWriteStudents = canWriteStrandFromPermissions(permissions, "students");
+
+  // Prefer legacy role-based routing if present AND accessible
+  const roleTarget = resolveDefaultRouteForRoles(roles);
+  const roleTargetAllowed =
+    (roleTarget === "/schedule/actors" && (canWriteActors || canReadActors)) ||
+    (roleTarget === "/schedule/students" && (canWriteStudents || canReadStudents)) ||
+    (roleTarget === "/timetable/actors" && canReadActors) ||
+    (roleTarget === "/timetable/students" && canReadStudents);
+  if (roleTarget !== "/not-authorized" && roleTargetAllowed) return roleTarget;
+
+  // Fallback to permissions-based routing
+  if (canWriteActors) return "/schedule/actors";
+  if (canWriteStudents) return "/schedule/students";
+  if (canReadActors) return "/timetable/actors";
+  if (canReadStudents) return "/timetable/students";
+
+  return "/not-authorized";
+};

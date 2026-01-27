@@ -19,3 +19,27 @@ padding:0px !important;
   display:flex;
   align-content: center;
 }
+.MuiClockNumber-root{
+  color:#000 !important;
+}
+.MuiClockNumber-root.Mui-selected{
+  color:#fff !important;
+  background-color:#01a5ae !important;
+  border-radius:50%;
+}
+.MuiPickersClockNumber-root{
+  color:#000 !important;
+}
+.MuiPickersClockNumber-root.Mui-selected{
+  color:#fff !important;
+  background-color:#01a5ae !important;
+  border-radius:50%;
+}
+/* desktop list view */
+.MuiMultiSectionDigitalClockSection-item{
+  color:#000 !important;
+}
+.MuiMultiSectionDigitalClockSection-item.Mui-selected{
+  color:#fff !important;
+  background-color:#01a5ae !important;
+}

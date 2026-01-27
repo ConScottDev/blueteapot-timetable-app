@@ -21,7 +21,7 @@ const ColorPickerModal = ({ open, onClose, selectedColor, onSelectColor }) => {
   return (
     <StyledDialog open={open} onClose={onClose} fullWidth={false} maxWidth={false}>
       <DialogTitle>Select Event Color</DialogTitle>
-      <DialogContent style={{ padding: "#fff" }}>
+      <DialogContent sx={{ backgroundColor: "#fff" }}>
         <ChromePicker color={selectedColor} onChangeComplete={handleChangeComplete} disableAlpha />
       </DialogContent>
       <DialogActions style={{ justifyContent: "space-between" }}>

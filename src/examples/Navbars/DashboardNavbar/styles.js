@@ -63,6 +63,7 @@ function navbar(theme, ownerState) {
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
+      padding: `${pxToRem(4)} 0`,
 
       [breakpoints.up("sm")]: {
         minHeight: "auto",

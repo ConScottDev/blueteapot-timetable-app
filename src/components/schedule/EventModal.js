@@ -1,16 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import PropTypes from "prop-types";
 import styled from "styled-components";
-import {
-  collection,
-  getDocs,
-  query,
-  where,
-  documentId,
-  doc,
-  updateDoc,
-  deleteDoc,
-} from "firebase/firestore";
+import { doc, updateDoc, deleteDoc } from "firebase/firestore";
 import { db } from "utils/firebase";
 import MDButton from "../MDButton";
 import MDTypography from "../MDTypography";
@@ -134,16 +125,25 @@ const extractParticipantId = (raw) => {
 const EventModal = ({
   event,
   actors,
+  students = [],
   scheduleStrand = "actor",
+  participantMap = {},
   onClose,
   canEdit = true,
   showParticipants = true,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
-  const [userNameMap, setUserNameMap] = useState({});
-  const participantIds = Array.isArray(event.resource?.participants)
-    ? event.resource.participants
-    : [];
+  const participantSource = useMemo(() => {
+    if (Array.isArray(event.participants) && event.participants.length > 0) {
+      return event.participants;
+    }
+    return Array.isArray(event.resource?.participants) ? event.resource.participants : [];
+  }, [event.participants, event.resource?.participants]);
+
+  const participantIds = useMemo(
+    () => participantSource.map(extractParticipantId).filter(Boolean),
+    [participantSource]
+  );
   const [taskName, setTaskName] = useState(event.title || "");
   const [location, setLocation] = useState(event.resource?.location || "");
   const [tutor, setTutor] = useState(event.resource?.tutor || "");
@@ -158,17 +158,42 @@ const EventModal = ({
   const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
   const modalTitle = isEditing ? "Edit Event" : "Event Details";
 
-  const [students, setStudents] = useState([]);
-
   const participantOptions = useMemo(
     () => (scheduleStrand === "student" ? students : actors || []),
     [actors, scheduleStrand, students]
   );
 
-  const participantsById = useMemo(
-    () => Object.fromEntries(participantOptions.map((p) => [p.id, p])),
-    [participantOptions]
-  );
+  const participantsById = useMemo(() => {
+    const base = Object.fromEntries(participantOptions.map((p) => [p.id, p]));
+    // include any participant objects already on the event (with names)
+    const fromEvent = Object.fromEntries(
+      participantSource
+        .map((p) => {
+          const id = extractParticipantId(p);
+          return id ? [id, p] : null;
+        })
+        .filter(Boolean)
+    );
+    return { ...base, ...fromEvent, ...(participantMap || {}) };
+  }, [participantMap, participantOptions, participantSource]);
+
+  const participantDisplayLabels = useMemo(() => {
+    if (!Array.isArray(participantIds) || participantIds.length === 0) return [];
+    return participantIds.map((id) => {
+      const entry = participantsById[id] || {};
+      const name =
+        entry.name ||
+        entry.displayName ||
+        entry.fullName ||
+        entry.email ||
+        participantMap[id]?.name ||
+        participantMap[id]?.displayName ||
+        participantMap[id]?.fullName ||
+        participantMap[id]?.email ||
+        id;
+      return { id, name };
+    });
+  }, [participantIds, participantMap, participantsById]);
 
   const handleOpenColorPicker = () => {
     setIsColorPickerOpen(true);
@@ -183,44 +208,13 @@ const EventModal = ({
     // handleCloseColorPicker(); // Close the modal after selecting a color
   };
 
+  const canMutate = Boolean(canEdit);
+
   useEffect(() => {
-    if (!canEdit) {
+    if (!canMutate) {
       setIsEditing(false);
     }
-  }, [canEdit]);
-
-  useEffect(() => {
-    let alive = true;
-    if (scheduleStrand !== "student") {
-      setStudents([]);
-      return () => {};
-    }
-
-    (async () => {
-      try {
-        const snap = await getDocs(
-          query(
-            collection(db, "users"),
-            where("role", "==", "student"),
-            where("disabled", "==", false)
-          )
-        );
-        const list = snap.docs.map((d) => ({
-          id: d.id,
-          name: d.data()?.displayName || d.data()?.name || d.data()?.email || d.id,
-          ...d.data(),
-        }));
-        if (alive) setStudents(list);
-      } catch (e) {
-        console.error("Failed to load students:", e);
-        if (alive) setStudents([]);
-      }
-    })();
-
-    return () => {
-      alive = false;
-    };
-  }, [scheduleStrand]);
+  }, [canMutate]);
 
   useEffect(() => {
     if (event) {
@@ -303,48 +297,10 @@ const EventModal = ({
   };
 
   useEffect(() => {
-    let isMounted = true;
-    (async () => {
-      try {
-        const ids = participantIds.map(extractParticipantId).filter(Boolean);
-        const map = await fetchUsersByIds(ids);
-        if (isMounted) setUserNameMap(map);
-      } catch (e) {
-        console.error("Failed to load participant names:", e);
-        if (isMounted) setUserNameMap({});
-      }
-    })();
-    return () => {
-      isMounted = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [event?.id]); // re-fetch when a different event is opened
-
-  useEffect(() => {
     const normalized = participantIds.map(extractParticipantId).filter(Boolean);
     setParticipants(normalized);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [event?.id]);
-
-  const fetchUsersByIds = async (ids) => {
-    if (!ids || ids.length === 0) return {};
-    const chunks = [];
-    for (let i = 0; i < ids.length; i += 10) chunks.push(ids.slice(i, i + 10));
-
-    const results = {};
-    const usersCol = collection(db, "users");
-
-    for (const chunk of chunks) {
-      const q = query(usersCol, where(documentId(), "in", chunk));
-      const snap = await getDocs(q);
-      snap.forEach((docSnap) => {
-        const data = docSnap.data();
-        // Adjust key if your field is named differently (e.g., data.displayName)
-        results[docSnap.id] = data?.name || docSnap.id;
-      });
-    }
-    return results;
-  };
+  }, [event?.id, participantIds]);
 
   return (
     <ModalOverlay style={{ zIndex: 1200 }}>
@@ -477,7 +433,9 @@ const EventModal = ({
                         {selected.map((id) => (
                           <Chip
                             key={id}
-                            label={participantsById[id]?.name || userNameMap[id] || id}
+                            label={
+                              participantsById[id]?.name || participantsById[id]?.displayName || id
+                            }
                             size="small"
                           />
                         ))}
@@ -532,20 +490,22 @@ const EventModal = ({
                   />
                 </FormField>
               )}
-              <MDBox pt={2} display="flex" justifyContent="space-between" alignItems="center">
-                <MDButton type="submit" variant="contained" color="info" size="small">
-                  Save
-                </MDButton>
-                <MDButton
-                  type="button"
-                  onClick={() => setIsEditing(false)}
-                  variant="outlined"
-                  color="info"
-                  size="small"
-                >
-                  Cancel
-                </MDButton>
-              </MDBox>
+              {canMutate && (
+                <MDBox pt={2} display="flex" justifyContent="space-between" alignItems="center">
+                  <MDButton type="submit" variant="contained" color="info" size="small">
+                    Save
+                  </MDButton>
+                  <MDButton
+                    type="button"
+                    onClick={() => setIsEditing(false)}
+                    variant="outlined"
+                    color="info"
+                    size="small"
+                  >
+                    Cancel
+                  </MDButton>
+                </MDBox>
+              )}
             </form>
           ) : (
             <MDBox>
@@ -584,13 +544,13 @@ const EventModal = ({
                 <FormField>
                   <MDTypography variant="body2" fontWeight="regular">
                     <strong>Participants:</strong>{" "}
-                    {participantIds.length
-                      ? participantIds.map((id) => userNameMap[id] || id).join(", ")
+                    {participantDisplayLabels.length
+                      ? participantDisplayLabels.map((p) => p.name || p.id).join(", ")
                       : "No participants"}
                   </MDTypography>
                 </FormField>
               )}
-              {canEdit && (
+              {canMutate && (
                 <MDBox pt={2} display="flex" justifyContent="space-between" alignItems="center">
                   <MDButton
                     variant="outlined"
@@ -616,6 +576,8 @@ const EventModal = ({
 EventModal.propTypes = {
   event: PropTypes.object.isRequired,
   actors: PropTypes.array.isRequired,
+  students: PropTypes.array,
+  participantMap: PropTypes.object,
   scheduleStrand: PropTypes.oneOf(["actor", "student"]),
   onClose: PropTypes.func.isRequired,
   canEdit: PropTypes.bool,

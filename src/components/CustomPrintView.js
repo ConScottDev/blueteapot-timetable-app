@@ -284,20 +284,25 @@ class CustomPrintView extends React.Component {
               label="Select Start Date"
               value={this.state.selectedDate}
               onChange={(newDate) => this.handleDateChange(newDate)}
-              renderInput={(params) => <TextField {...params} />}
+              renderInput={(params) => (
+                <TextField {...params} className="start-date-field" size="small" fullWidth />
+              )}
             />
           </LocalizationProvider>
           <MDTypography className="title" fontSize="16px">
             {localizer.format(start, "DD/MM/yyyy")} - {localizer.format(end, "DD/MM/yyyy")}
           </MDTypography>
           <TextField
+            className="pages-input"
+            label="Pages"
             type="number"
             value={numberOfPages}
             onChange={(e) =>
               this.setState({ numberOfPages: Math.min(parseInt(e.target.value, 10) || 1, 5) })
             }
             inputProps={{ min: 1, max: 5 }}
-            style={{ marginRight: "8px" }}
+            size="small"
+            fullWidth
             error={numberOfPages < 1 || numberOfPages > 5}
             helperText={
               numberOfPages < 1
@@ -308,7 +313,11 @@ class CustomPrintView extends React.Component {
             }
           />
 
-          <IconButton onClick={this.openExportMenu} aria-label="Export options">
+          <IconButton
+            className="export-button"
+            onClick={this.openExportMenu}
+            aria-label="Export options"
+          >
             <MoreVertIcon />
           </IconButton>
           <Menu
@@ -389,40 +398,42 @@ class CustomPrintView extends React.Component {
                       </div>
                     </div>
 
-                    <div
-                      className={clsx("rbc-month-view", className, "print-view")}
-                      role="table"
-                      aria-label={`Month View ${pageIndex + 1}`}
-                      ref={this.containerRef}
-                    >
-                      <div className="rbc-row rbc-month-header" role="row">
-                        <div className="rbc-header time-header">Time</div>
-                        {weeksToRender.length > 0 && this.renderHeaders(weeksToRender[0])}
-                        <div className="rbc-header notes-header">Notes</div>
-                      </div>
+                    <div className="print-calendar-wrapper">
+                      <div
+                        className={clsx("rbc-month-view", className, "print-view")}
+                        role="table"
+                        aria-label={`Month View ${pageIndex + 1}`}
+                        ref={this.containerRef}
+                      >
+                        <div className="rbc-row rbc-month-header" role="row">
+                          <div className="rbc-header time-header">Time</div>
+                          {weeksToRender.length > 0 && this.renderHeaders(weeksToRender[0])}
+                          <div className="rbc-header notes-header">Notes</div>
+                        </div>
 
-                      {weeksToRender.map((week, weekIdx) => (
-                        <div key={weekIdx} className="rbc-month-row">
-                          <div className="rbc-time-column">
-                            <div className="rbc-time-column-header">Time</div>
-                            {timeSlots.map((time, idx) => (
-                              <div key={idx} className="rbc-time-cell">
-                                {time}
+                        {weeksToRender.map((week, weekIdx) => (
+                          <div key={weekIdx} className="rbc-month-row">
+                            <div className="rbc-time-column">
+                              <div className="rbc-time-column-header">Time</div>
+                              {timeSlots.map((time, idx) => (
+                                <div key={idx} className="rbc-time-cell">
+                                  {time}
+                                </div>
+                              ))}
+                            </div>
+
+                            <div className="rbc-week-days">{this.renderWeek(week, weekIdx)}</div>
+
+                            <div className="rbc-notes-column">
+                              <div className="rbc-time-column-header">Individual Notes</div>
+                              <div className="rbc-notes-cell">
+                                {this.renderSingleNoteCell(weekIdx, calendarId)}
                               </div>
-                            ))}
-                          </div>
-
-                          <div className="rbc-week-days">{this.renderWeek(week, weekIdx)}</div>
-
-                          <div className="rbc-notes-column">
-                            <div className="rbc-time-column-header">Individual Notes</div>
-                            <div className="rbc-notes-cell">
-                              {this.renderSingleNoteCell(weekIdx, calendarId)}
                             </div>
                           </div>
-                        </div>
-                      ))}
-                      {this.props.popup && this.renderOverlay()}
+                        ))}
+                        {this.props.popup && this.renderOverlay()}
+                      </div>
                     </div>
                   </div>
                 );
@@ -491,51 +502,53 @@ class CustomPrintView extends React.Component {
                     </div>
                   </div>
 
-                  <div
-                    className={clsx(
-                      "rbc-month-view",
-                      className,
-                      "print-view",
-                      "pre-print-calendar"
-                    )}
-                    role="table"
-                    aria-label="Month View"
-                  >
-                    <div className="rbc-row rbc-month-header" role="row">
-                      <div className="rbc-header time-header">Time</div>
-                      {weeksToRender.length > 0 && this.renderHeaders(weeksToRender[0])}
-                      <div className="rbc-header notes-header">Notes</div>
-                    </div>
+                  <div className="print-calendar-wrapper">
+                    <div
+                      className={clsx(
+                        "rbc-month-view",
+                        className,
+                        "print-view",
+                        "pre-print-calendar"
+                      )}
+                      role="table"
+                      aria-label="Month View"
+                    >
+                      <div className="rbc-row rbc-month-header" role="row">
+                        <div className="rbc-header time-header">Time</div>
+                        {weeksToRender.length > 0 && this.renderHeaders(weeksToRender[0])}
+                        <div className="rbc-header notes-header">Notes</div>
+                      </div>
 
-                    {weeksToRender.map((week, weekIdx) => {
-                      // Note key should match the format stored in state
-                      const calendarIndex = pageIndex + 1; // Adjust calendarIndex based on pageIndex
-                      const noteKey = `calendar-${calendarIndex}-${weekIdx}`;
+                      {weeksToRender.map((week, weekIdx) => {
+                        // Note key should match the format stored in state
+                        const calendarIndex = pageIndex + 1; // Adjust calendarIndex based on pageIndex
+                        const noteKey = `calendar-${calendarIndex}-${weekIdx}`;
 
-                      return (
-                        <div key={weekIdx} className="rbc-month-row">
-                          <div className="rbc-time-column">
-                            <div className="rbc-time-column-header">Time</div>
-                            {timeSlots.map((time, idx) => (
-                              <div key={idx} className="rbc-time-cell">
-                                {time}
+                        return (
+                          <div key={weekIdx} className="rbc-month-row">
+                            <div className="rbc-time-column">
+                              <div className="rbc-time-column-header">Time</div>
+                              {timeSlots.map((time, idx) => (
+                                <div key={idx} className="rbc-time-cell">
+                                  {time}
+                                </div>
+                              ))}
+                            </div>
+
+                            <div className="rbc-week-days">{this.renderWeek(week, weekIdx)}</div>
+
+                            <div className="rbc-notes-column">
+                              <div className="rbc-time-column-header">Individual Notes</div>
+                              <div className="rbc-notes-cell">
+                                <MDTypography p={1} variant="body2" fontWeight="medium">
+                                  {notes[noteKey] || ""}
+                                </MDTypography>
                               </div>
-                            ))}
-                          </div>
-
-                          <div className="rbc-week-days">{this.renderWeek(week, weekIdx)}</div>
-
-                          <div className="rbc-notes-column">
-                            <div className="rbc-time-column-header">Individual Notes</div>
-                            <div className="rbc-notes-cell">
-                              <MDTypography p={1} variant="body2" fontWeight="medium">
-                                {notes[noteKey] || ""}
-                              </MDTypography>
                             </div>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               );
