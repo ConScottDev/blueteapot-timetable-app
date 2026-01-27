@@ -1,11 +1,23 @@
-import { Capacitor } from "@capacitor/core";
-import { PushNotifications } from "@capacitor/push-notifications";
 import { httpsCallable } from "firebase/functions";
+import { Capacitor } from "@capacitor/core";
 import { functions } from "./firebase";
 
 const registerPushTokenFn = httpsCallable(functions, "registerPushToken");
 
-async function ensurePushPermissions() {
+let pushNotificationsPromise = null;
+
+// Only attempt to load on native platforms (iOS/Android)
+export async function getPushNotifications() {
+  if (!Capacitor.isNativePlatform()) return null;
+  if (!pushNotificationsPromise) {
+    pushNotificationsPromise = import("@capacitor/push-notifications")
+      .then((mod) => mod.PushNotifications)
+      .catch(() => null);
+  }
+  return pushNotificationsPromise;
+}
+
+async function ensurePushPermissions(PushNotifications) {
   const status = await PushNotifications.checkPermissions();
   if (status.receive === "granted") return true;
 
@@ -13,7 +25,7 @@ async function ensurePushPermissions() {
   return req.receive === "granted";
 }
 
-async function waitForRegistrationToken() {
+async function waitForRegistrationToken(PushNotifications) {
   return new Promise((resolve, reject) => {
     let resolved = false;
     let regSub;
@@ -56,10 +68,13 @@ export async function registerDevicePushToken(user, options = {}) {
   }
   if (!Capacitor.isNativePlatform()) return { ok: false, reason: "not-native" };
 
-  const granted = await ensurePushPermissions();
+  const PushNotifications = await getPushNotifications();
+  if (!PushNotifications) return { ok: false, reason: "not-available" };
+
+  const granted = await ensurePushPermissions(PushNotifications);
   if (!granted) return { ok: false, reason: "permission-denied" };
 
-  const token = await waitForRegistrationToken();
+  const token = await waitForRegistrationToken(PushNotifications);
   if (!token) return { ok: false, reason: "no-token" };
 
   await registerPushTokenFn({
