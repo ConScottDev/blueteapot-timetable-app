@@ -25,3 +25,16 @@ package-lock.json
 yarn.lock
 
 commit.sh
+
+# electron / builder outputs
+/dist
+/out
+/release
+*.exe
+*.msi
+*.dmg
+*.AppImage
+*.blockmap
+*.asar
+latest*.yml
+builder-debug.yml
