@@ -1,6 +1,6 @@
 {
   "name": "blue-teapot-scheduling",
-  "version": "2.3.16",
+  "version": "2.3.17",
   "private": true,
   "homepage": "./",
   "author": "Conor Scott",
@@ -30,7 +30,10 @@
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "entitlements": "buildResources/entitlements.mac.plist",
-      "entitlementsInherit": "buildResources/entitlements.mac.plist"
+      "entitlementsInherit": "buildResources/entitlements.mac.plist",
+      "notarize": {
+    "teamId": "ptzh-obzy-bxmh-sqjg"
+  }
     },
     "win": {
       "icon": "buildResources/icon.ico",
