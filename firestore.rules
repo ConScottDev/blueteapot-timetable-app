@@ -37,14 +37,35 @@ service cloud.firestore {
         : null;
     }
 
-    function hasUsersRead() {
-      let profile = userProfile();
-      return isSuperUser() || (profile != null && profile.permissions != null && profile.permissions.users != null && profile.permissions.users.read == true);
+    function targetUserRole() {
+      // prefer incoming data (create/update), else fall back to stored doc
+      return request.resource != null && request.resource.data != null && request.resource.data.role != null
+        ? request.resource.data.role
+        : (resource != null && resource.data != null && resource.data.role != null ? resource.data.role : null);
     }
 
-    function hasUsersWrite() {
+    function hasUserRoleRead(targetRole) {
       let profile = userProfile();
-      return isSuperUser() || (profile != null && profile.permissions != null && profile.permissions.users != null && profile.permissions.users.write == true);
+      return isSuperUser() ||
+        (profile != null &&
+          profile.permissions != null &&
+          (
+            (profile.permissions.users != null && profile.permissions.users.read == true) ||
+            (targetRole == "actor" && profile.permissions.userActors != null && profile.permissions.userActors.read == true) ||
+            (targetRole == "student" && profile.permissions.userStudents != null && profile.permissions.userStudents.read == true)
+          ));
+    }
+
+    function hasUserRoleWrite(targetRole) {
+      let profile = userProfile();
+      return isSuperUser() ||
+        (profile != null &&
+          profile.permissions != null &&
+          (
+            (profile.permissions.users != null && profile.permissions.users.write == true) ||
+            (targetRole == "actor" && profile.permissions.userActors != null && profile.permissions.userActors.write == true) ||
+            (targetRole == "student" && profile.permissions.userStudents != null && profile.permissions.userStudents.write == true)
+          ));
     }
 
     function hasStrandWrite(strand) {
@@ -66,10 +87,10 @@ service cloud.firestore {
 
     // User directory
     match /users/{uid} {
-      // Read: super-user, delegated read via permissions.users.read, or self
-      allow read: if hasUsersRead() || (isSignedIn() && request.auth.uid == uid);
-      // Write: super-user or delegated write via permissions.users.write
-      allow write: if hasUsersWrite();
+      // Read: super-user, delegated read for the target role, theatre staff, or self
+      allow read: if hasUserRoleRead(targetUserRole()) || isStaff() || (isSignedIn() && request.auth.uid == uid);
+      // Write: super-user or delegated write for the target role
+      allow write: if hasUserRoleWrite(targetUserRole());
     }
 
     match /groups/{groupId} {

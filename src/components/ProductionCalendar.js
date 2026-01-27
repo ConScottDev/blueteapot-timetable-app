@@ -238,21 +238,23 @@ class ProductionCalendar extends React.Component {
               content={() => this.printRef.current}
             />
           </div>
-          <div
-            className={clsx("rbc-month-view", className, "print-view prod-cal")}
-            role="table"
-            aria-label="Month View"
-            ref={this.containerRef}
-          >
-            <div className="rbc-row rbc-month-header" role="row">
-              {this.renderHeaders(weeks[0])}
-            </div>
-            {weeks.map((week, weekIdx) => (
-              <div key={weekIdx} className="rbc-month-row">
-                <div className="rbc-week-days">{this.renderWeek(week, weekIdx)}</div>
+          <div className="print-calendar-wrapper">
+            <div
+              className={clsx("rbc-month-view", className, "print-view prod-cal")}
+              role="table"
+              aria-label="Month View"
+              ref={this.containerRef}
+            >
+              <div className="rbc-row rbc-month-header" role="row">
+                {this.renderHeaders(weeks[0])}
               </div>
-            ))}
-            {this.props.popup && this.renderOverlay()}
+              {weeks.map((week, weekIdx) => (
+                <div key={weekIdx} className="rbc-month-row">
+                  <div className="rbc-week-days">{this.renderWeek(week, weekIdx)}</div>
+                </div>
+              ))}
+              {this.props.popup && this.renderOverlay()}
+            </div>
           </div>
         </div>
         <div style={{ display: "none" }}>
@@ -281,20 +283,22 @@ class ProductionCalendar extends React.Component {
             <MDTypography style={{ fontSize: "20px", fontWeight: 600 }}>{actorName}</MDTypography>
           )}
         </div>
-        <div
-          className={clsx("rbc-month-view", className, "print-view", "pre-print-calendar")}
-          role="table"
-          aria-label="Month View"
-        >
-          <div className="rbc-row rbc-month-header" role="row">
-            {this.renderHeaders(weeks[0])}
-          </div>
-
-          {weeks.map((week, weekIdx) => (
-            <div key={weekIdx} className="rbc-month-row">
-              <div className="rbc-week-days">{this.renderWeek(week, weekIdx)}</div>
+        <div className="print-calendar-wrapper">
+          <div
+            className={clsx("rbc-month-view", className, "print-view", "pre-print-calendar")}
+            role="table"
+            aria-label="Month View"
+          >
+            <div className="rbc-row rbc-month-header" role="row">
+              {this.renderHeaders(weeks[0])}
             </div>
-          ))}
+
+            {weeks.map((week, weekIdx) => (
+              <div key={weekIdx} className="rbc-month-row">
+                <div className="rbc-week-days">{this.renderWeek(week, weekIdx)}</div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -363,11 +367,9 @@ class ProductionCalendar extends React.Component {
     const isCurrent = localizer.isSameDate(date, currentDate);
     const drilldownView = getDrilldownView(date);
 
-    // Get the correct month name and day number
-    const monthName = localizer.format(date, "MMMM"); // "August"
-    const dayNumber = date.getDate(); // Correct day number
-
-    // Combine month name and correct day number
+    // Match print view: abbreviated month + day number (e.g., "Dec 3")
+    const monthName = localizer.format(date, "MMM");
+    const dayNumber = date.getDate();
     const label = `${monthName} ${dayNumber}`;
 
     const DateHeaderComponent = this.props.components.dateHeader || DateHeader;

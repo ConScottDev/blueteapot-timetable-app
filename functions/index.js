@@ -10,10 +10,14 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { initializeApp } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
+const { getMessaging } = require("firebase-admin/messaging");
 const nodemailer = require("nodemailer");
 const logger = require("firebase-functions/logger");
 
 initializeApp();
+
+const DISABLE_TASK_EMAILS = process.env.DISABLE_TASK_EMAILS === "true";
+const DISABLE_TASK_PUSH = process.env.DISABLE_TASK_PUSH === "true";
 
 const DEFAULT_SMTP = {
   host: "smtp-relay.brevo.com",
@@ -30,10 +34,7 @@ const mailConfig = {
   user: process.env.SMTP_USER || DEFAULT_SMTP.user,
   pass: process.env.SMTP_PASS || DEFAULT_SMTP.pass,
   from:
-    process.env.SMTP_FROM ||
-    process.env.SMTP_SENDER ||
-    process.env.SMTP_USER ||
-    DEFAULT_SMTP.from,
+    process.env.SMTP_FROM || process.env.SMTP_SENDER || process.env.SMTP_USER || DEFAULT_SMTP.from,
   fromName: process.env.SMTP_FROM_NAME || DEFAULT_SMTP.fromName || null,
 };
 
@@ -96,7 +97,9 @@ function getMailTransport() {
   if (!mailConfig.host || !mailConfig.user || !mailConfig.pass) {
     if (!mailTransportWarned) {
       mailTransportWarned = true;
-      logger.warn("notifyTaskParticipants: SMTP credentials missing. Email notifications disabled.");
+      logger.warn(
+        "notifyTaskParticipants: SMTP credentials missing. Email notifications disabled."
+      );
     }
     return null;
   }
@@ -197,12 +200,14 @@ async function fetchParticipantProfiles(ids) {
         const data = snap.data() || {};
         const displayName = data.displayName || data.name || data.email || id;
         const firstName = data.firstName || inferFirstName(displayName, displayName);
+        const notifications = data.notifications || {};
         return {
           id,
           email: data.email || null,
           additionalEmails: Array.isArray(data.additionalEmails) ? data.additionalEmails : [],
           name: displayName,
           firstName,
+          pushEnabled: notifications.push !== false,
         };
       } catch (error) {
         logger.error("notifyTaskParticipants: failed to load participant profile", { id, error });
@@ -257,7 +262,10 @@ function formatTaskDetails(snapshot) {
 
 function valueForDiff(value) {
   if (Array.isArray(value)) {
-    return value.map((v) => String(v)).sort().join(", ");
+    return value
+      .map((v) => String(v))
+      .sort()
+      .join(", ");
   }
   if (typeof value === "boolean") {
     return value ? "Yes" : "No";
@@ -352,8 +360,86 @@ function buildEmailBodies({ greetingName, intro, detailLines, diffLines }) {
   return { text, html };
 }
 
-async function maybeQueuePushNotification() {
-  // TODO: integrate FCM/mobile push notifications when the client workflow is ready.
+async function fetchPushTokensForUsers(userIds = []) {
+  const db = getFirestore();
+  const tokens = new Set();
+  await Promise.all(
+    userIds.map(async (uid) => {
+      try {
+        const snap = await db.collection(`users/${uid}/pushTokens`).get();
+        snap.forEach((doc) => {
+          const data = doc.data() || {};
+          const token = data.token || doc.id;
+          if (typeof token === "string" && token.trim()) tokens.add(token.trim());
+        });
+      } catch (error) {
+        logger.error("fetchPushTokensForUsers: failed to load tokens", { uid, error });
+      }
+    })
+  );
+  return Array.from(tokens);
+}
+
+function buildPushBody(snapshot) {
+  if (!snapshot) return "A task has been updated.";
+  const formattedDate = formatDateEuropean(snapshot.date);
+  const timeRange =
+    snapshot.startTime && snapshot.endTime
+      ? `${snapshot.startTime} - ${snapshot.endTime}`
+      : snapshot.startTime || snapshot.endTime || "";
+  const parts = [formattedDate];
+  if (timeRange) parts.push(timeRange);
+  if (snapshot.location) parts.push(snapshot.location);
+  return parts.filter(Boolean).join(" • ");
+}
+
+async function maybeQueuePushNotification(context = {}) {
+  const { changeType, current, previous, participantIds = [], participants = [], taskId } = context;
+  if (!participantIds.length) return;
+
+  const eligibleIds = participants.length
+    ? participants.filter((p) => p?.pushEnabled !== false).map((p) => p.id)
+    : participantIds;
+  if (!eligibleIds.length) return;
+
+  const tokens = await fetchPushTokensForUsers(eligibleIds);
+  if (!tokens.length) {
+    logger.debug("maybeQueuePushNotification: no tokens found for participants", { taskId });
+    return;
+  }
+
+  const snapshot = changeType === "deleted" ? previous : current;
+  const title =
+    changeType === "deleted"
+      ? `Task cancelled: ${(snapshot && snapshot.title) || "Untitled task"}`
+      : `Task updated: ${(snapshot && snapshot.title) || "Untitled task"}`;
+  const body = buildPushBody(snapshot);
+
+  try {
+    const messaging = getMessaging();
+    const response = await messaging.sendEachForMulticast({
+      tokens,
+      notification: { title, body },
+      data: {
+        taskId: taskId || "",
+        changeType: changeType || "",
+        date: snapshot?.date ? String(snapshot.date) : "",
+        title: snapshot?.title || "",
+      },
+    });
+    logger.info("maybeQueuePushNotification: push multicast sent", {
+      taskId,
+      changeType,
+      successCount: response.successCount,
+      failureCount: response.failureCount,
+    });
+  } catch (error) {
+    logger.error("maybeQueuePushNotification: failed to send push notifications", {
+      taskId,
+      changeType,
+      error,
+    });
+  }
 }
 
 exports.syncUserClaimsOnWrite = onDocumentWritten("users/{uid}", async (event) => {
@@ -382,6 +468,10 @@ exports.syncUserClaimsOnWrite = onDocumentWritten("users/{uid}", async (event) =
 });
 
 exports.notifyTaskParticipants = onDocumentWritten("tasks/{taskId}", async (event) => {
+  if (DISABLE_TASK_EMAILS && DISABLE_TASK_PUSH) {
+    logger.warn("notifyTaskParticipants: notifications disabled via env flags");
+    return;
+  }
   const taskId = event.params.taskId;
   const before = event.data?.before?.data();
   const after = event.data?.after?.data();
@@ -389,6 +479,10 @@ exports.notifyTaskParticipants = onDocumentWritten("tasks/{taskId}", async (even
   if (!before && !after) return;
 
   const changeType = !before ? "created" : !after ? "deleted" : "updated";
+  if (changeType === "created") {
+    logger.info("notifyTaskParticipants: skipping email for newly created task", { taskId });
+    return;
+  }
   const participantIds = Array.from(
     new Set([
       ...normalizeParticipantIds(before?.participants || []),
@@ -423,7 +517,8 @@ exports.notifyTaskParticipants = onDocumentWritten("tasks/{taskId}", async (even
 
   const detailSnapshot = changeType === "deleted" ? previousSnapshot : currentSnapshot;
   const detailLines = formatTaskDetails(detailSnapshot);
-  const diffLines = changeType === "updated" ? listDifferences(previousSnapshot, currentSnapshot) : [];
+  const diffLines =
+    changeType === "updated" ? listDifferences(previousSnapshot, currentSnapshot) : [];
   const subject = buildEmailSubject(changeType, currentSnapshot, previousSnapshot);
   const intro = introForChange(changeType);
 
@@ -433,18 +528,38 @@ exports.notifyTaskParticipants = onDocumentWritten("tasks/{taskId}", async (even
     current: currentSnapshot,
     previous: previousSnapshot,
     participants: profiles,
+    participantIds,
   };
 
   if (recipients.length === 0) {
-    logger.info("notifyTaskParticipants: no recipients with email addresses", { taskId, changeType });
-    await maybeQueuePushNotification(notificationContext);
+    logger.info("notifyTaskParticipants: no recipients with email addresses", {
+      taskId,
+      changeType,
+    });
+    if (!DISABLE_TASK_PUSH) {
+      await maybeQueuePushNotification(notificationContext);
+    } else {
+      logger.info("notifyTaskParticipants: push disabled via env flag", { taskId, changeType });
+    }
     return;
   }
 
   const transporter = getMailTransport();
+
+  if (DISABLE_TASK_EMAILS) {
+    logger.info("notifyTaskParticipants: email disabled via env flag", { taskId, changeType });
+    // still allow push (if enabled)
+    if (!DISABLE_TASK_PUSH) await maybeQueuePushNotification(notificationContext);
+    return;
+  }
+
   if (!transporter) {
     logger.warn("notifyTaskParticipants: SMTP not configured, skipping email dispatch", { taskId });
-    await maybeQueuePushNotification(notificationContext);
+    if (!DISABLE_TASK_PUSH) {
+      await maybeQueuePushNotification(notificationContext);
+    } else {
+      logger.info("notifyTaskParticipants: push disabled via env flag", { taskId, changeType });
+    }
     return;
   }
 
@@ -494,7 +609,11 @@ exports.notifyTaskParticipants = onDocumentWritten("tasks/{taskId}", async (even
     })
   );
 
-  await maybeQueuePushNotification(notificationContext);
+  if (!DISABLE_TASK_PUSH) {
+    await maybeQueuePushNotification(notificationContext);
+  } else {
+    logger.info("notifyTaskParticipants: push disabled via env flag", { taskId, changeType });
+  }
 });
 
 exports.adminCreateUser = onCall(async (request) => {
@@ -645,6 +764,31 @@ exports.adminDeleteUser = onCall(async (request) => {
 
   // Delete Firestore profile (ignore if missing)
   await db.doc(`users/${uid}`).delete();
+
+  return { ok: true };
+});
+
+exports.registerPushToken = onCall(async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Authentication required");
+
+  const { token, platform = "unknown", deviceId = null } = request.data || {};
+  if (!token || typeof token !== "string") {
+    throw new HttpsError("invalid-argument", "token is required");
+  }
+
+  const db = getFirestore();
+  const docRef = db.doc(`users/${uid}/pushTokens/${token}`);
+  await docRef.set(
+    {
+      token,
+      platform,
+      deviceId: deviceId || null,
+      updatedAt: FieldValue.serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
+    },
+    { merge: true }
+  );
 
   return { ok: true };
 });

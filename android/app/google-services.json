@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "342461627260",
+    "project_id": "bluetapot-scheduling-app",
+    "storage_bucket": "bluetapot-scheduling-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:342461627260:android:937f135512a96515b402f9",
+        "android_client_info": {
+          "package_name": "ie.blueteapot.schedule"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA-iBUL-b9bc1TIQj9JIiBzUoo1EtOuuiQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

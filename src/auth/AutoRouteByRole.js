@@ -2,7 +2,7 @@
 import { useRef } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "./AuthProvider";
-import { resolveDefaultRouteForRoles } from "./roleUtils";
+import { resolveDefaultRouteForAccess } from "./roleUtils";
 
 export default function AutoRouteByRole() {
   const { user, loading } = useAuth();
@@ -35,7 +35,7 @@ export default function AutoRouteByRole() {
   }
 
   const roles = Array.isArray(user?.roles) ? user.roles : [];
-  const target = resolveDefaultRouteForRoles(roles);
+  const target = resolveDefaultRouteForAccess(roles, user?.permissions);
 
   if (!target || requestedPath === target || location.pathname === target) {
     return null;

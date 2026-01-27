@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import PropTypes from "prop-types";
 import List from "@mui/material/List";
@@ -20,7 +20,6 @@ import {
   setWhiteSidenav,
 } from "context";
 import { useAuth } from "auth/AuthProvider";
-import { useState, useMemo, useCallback } from "react";
 
 function Sidenav({ color, brand, brandName, routes, ...rest }) {
   const [controller, dispatch] = useMaterialUIController();
@@ -29,6 +28,7 @@ function Sidenav({ color, brand, brandName, routes, ...rest }) {
   const pathname = location.pathname;
   const navigate = useNavigate();
   const { user, hasRole, canReadStrand, canWriteStrand, canReadUsers } = useAuth();
+  const sidenavRef = useRef(null);
 
   let textColor = "white";
 
@@ -38,7 +38,7 @@ function Sidenav({ color, brand, brandName, routes, ...rest }) {
     textColor = "inherit";
   }
 
-  const closeSidenav = () => setMiniSidenav(dispatch, true);
+  const closeSidenav = useCallback(() => setMiniSidenav(dispatch, true), [dispatch]);
 
   useEffect(() => {
     function handleMiniSidenav() {
@@ -142,6 +142,31 @@ function Sidenav({ color, brand, brandName, routes, ...rest }) {
     });
   };
 
+  useEffect(() => {
+    // Close the drawer on mobile after a route change
+    if (window.innerWidth < 1200) {
+      closeSidenav();
+    }
+  }, [pathname, closeSidenav]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      const isMobile = window.innerWidth < 1200;
+      if (!isMobile || miniSidenav) return;
+      if (sidenavRef.current && !sidenavRef.current.contains(event.target)) {
+        closeSidenav();
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("touchstart", handleClickOutside);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+    };
+  }, [miniSidenav, closeSidenav]);
+
   const RenderItem = ({ route, depth = 0 }) => {
     const { type, name, icon, title, noCollapse, key, href, route: to, collapse } = route;
 
@@ -229,6 +254,7 @@ function Sidenav({ color, brand, brandName, routes, ...rest }) {
 
   return (
     <SidenavRoot
+      ref={sidenavRef}
       {...rest}
       variant="permanent"
       ownerState={{ transparentSidenav, whiteSidenav, miniSidenav, darkMode }}

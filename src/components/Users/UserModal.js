@@ -15,6 +15,10 @@ import MDInput from "components/MDInput";
 import Switch from "@mui/material/Switch";
 // Using MDInput with select for consistent sizing
 import MenuItem from "@mui/material/MenuItem";
+import IconButton from "@mui/material/IconButton";
+import InputAdornment from "@mui/material/InputAdornment";
+import Visibility from "@mui/icons-material/Visibility";
+import VisibilityOff from "@mui/icons-material/VisibilityOff";
 
 const USERNAME_ROLES = new Set(["actor", "student"]);
 
@@ -113,6 +117,8 @@ const UserModal = ({ onClose, user, isEditing, onUserSaved }) => {
   // password fields (admin-specified)
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [formError, setFormError] = useState("");
   const modalTitle = isEditing ? "Edit User" : "Add New User";
 
@@ -122,8 +128,18 @@ const UserModal = ({ onClose, user, isEditing, onUserSaved }) => {
   const [actorsWrite, setActorsWrite] = useState(user?.permissions?.actors?.write ?? false);
   const [studentsRead, setStudentsRead] = useState(user?.permissions?.students?.read ?? false);
   const [studentsWrite, setStudentsWrite] = useState(user?.permissions?.students?.write ?? false);
-  const [usersRead, setUsersRead] = useState(user?.permissions?.users?.read ?? false);
-  const [usersWrite, setUsersWrite] = useState(user?.permissions?.users?.write ?? false);
+  const [userActorsRead, setUserActorsRead] = useState(
+    user?.permissions?.userActors?.read ?? user?.permissions?.users?.read ?? false
+  );
+  const [userActorsWrite, setUserActorsWrite] = useState(
+    user?.permissions?.userActors?.write ?? user?.permissions?.users?.write ?? false
+  );
+  const [userStudentsRead, setUserStudentsRead] = useState(
+    user?.permissions?.userStudents?.read ?? user?.permissions?.users?.read ?? false
+  );
+  const [userStudentsWrite, setUserStudentsWrite] = useState(
+    user?.permissions?.userStudents?.write ?? user?.permissions?.users?.write ?? false
+  );
 
   // notifications
   const [notifyEmail, setNotifyEmail] = useState(user?.notifications?.email ?? true);
@@ -142,8 +158,41 @@ const UserModal = ({ onClose, user, isEditing, onUserSaved }) => {
   const { user: currentUser } = useAuth();
   const canGrantUserPerms =
     (currentUser?.email || "").toLowerCase() === "ensemble@blueteapot.ie".toLowerCase();
+  const canManageAllUsers =
+    !!currentUser?.isSuperUser ||
+    (!!currentUser?.permissions?.users?.write &&
+      (currentUser?.permissions?.userActors?.write ?? true) &&
+      (currentUser?.permissions?.userStudents?.write ?? true));
+  const canCreateActors = canManageAllUsers || !!currentUser?.permissions?.userActors?.write;
+  const canCreateStudents = canManageAllUsers || !!currentUser?.permissions?.userStudents?.write;
+
+  const allowedRoleOptions = useMemo(() => {
+    if (canManageAllUsers) {
+      return [
+        { value: "theatre_staff", label: "Theatre Staff" },
+        { value: "actor_support_staff", label: "Actor Support Staff" },
+        { value: "actor", label: "Actor" },
+        { value: "pas_staff", label: "PAS Staff" },
+        { value: "pas_support", label: "PAS Support" },
+        { value: "student", label: "Student" },
+      ];
+    }
+    const opts = [];
+    if (canCreateActors) opts.push({ value: "actor", label: "Actor" });
+    if (canCreateStudents) opts.push({ value: "student", label: "Student" });
+    return opts;
+  }, [canCreateActors, canCreateStudents, canManageAllUsers]);
 
   const permsDisabled = false;
+
+  useEffect(() => {
+    if (allowedRoleOptions.length === 0) return;
+    const allowedValues = new Set(allowedRoleOptions.map((o) => o.value));
+    if (!allowedValues.has(role)) {
+      setRole(allowedRoleOptions[0].value);
+    }
+  }, [allowedRoleOptions, role]);
+
   useEffect(() => {
     if (role === "actor") {
       setActorsRead(true);
@@ -181,8 +230,11 @@ const UserModal = ({ onClose, user, isEditing, onUserSaved }) => {
     if (!studentsRead && studentsWrite) setStudentsWrite(false);
   }, [studentsRead, studentsWrite]);
   useEffect(() => {
-    if (!usersRead && usersWrite) setUsersWrite(false);
-  }, [usersRead, usersWrite]);
+    if (!userActorsRead && userActorsWrite) setUserActorsWrite(false);
+  }, [userActorsRead, userActorsWrite]);
+  useEffect(() => {
+    if (!userStudentsRead && userStudentsWrite) setUserStudentsWrite(false);
+  }, [userStudentsRead, userStudentsWrite]);
 
   const [passwordError, setPasswordError] = useState("");
   useEffect(() => {
@@ -244,6 +296,10 @@ const UserModal = ({ onClose, user, isEditing, onUserSaved }) => {
       : [];
 
     // ---- VALIDATION RULES ----
+    const allowedValues = new Set(allowedRoleOptions.map((o) => o.value));
+    if (!allowedValues.has(role)) {
+      return setFormError("You do not have permission to assign this role.");
+    }
     if (!trimmedEmail) return setFormError("Email is required.");
     if (roleRequiresUsername && !trimmedUsername) {
       return setFormError("Username is required for actors and students.");
@@ -263,13 +319,6 @@ const UserModal = ({ onClose, user, isEditing, onUserSaved }) => {
         setPasswordError("Password must be at least 6 characters.");
         return setFormError("Password must be at least 6 characters.");
       }
-    }
-
-    // Editing: if user has NO uid yet, require a password to create the Auth user now
-    if (isEditing && !user?.uid && !password) {
-      return setFormError(
-        "This user has no Auth UID yet. Please set a password to create their account."
-      );
     }
 
     // If a password is provided, confirm must match and length check
@@ -297,7 +346,13 @@ const UserModal = ({ onClose, user, isEditing, onUserSaved }) => {
       permissions: {
         actors: { read: !!actorsRead, write: !!actorsWrite },
         students: { read: !!studentsRead, write: !!studentsWrite },
-        users: { read: !!usersRead, write: !!usersWrite },
+        userActors: { read: !!userActorsRead, write: !!userActorsWrite },
+        userStudents: { read: !!userStudentsRead, write: !!userStudentsWrite },
+        // legacy combined flag retained for compatibility when both strands are enabled
+        users: {
+          read: !!(userActorsRead && userStudentsRead),
+          write: !!(userActorsWrite && userStudentsWrite),
+        },
       },
       notifications: { email: !!notifyEmail, push: !!notifyPush },
       ...(role === "student"
@@ -315,32 +370,29 @@ const UserModal = ({ onClose, user, isEditing, onUserSaved }) => {
     try {
       let finalUid = trimmedUid || user?.uid || undefined;
 
-      // If creating OR we need to create a UID on edit OR we’re changing/setting password:
-      if (isCreating || !finalUid || password) {
-        // Call the callable which creates/updates Auth and writes /users/{uid} base fields.
-        const res = await callAdminUpsert({
-          uid: finalUid, // may be undefined for new
-          email: profile.email,
-          password: password || undefined, // required when creating
-          role,
-          displayName: profile.name,
-          group: null,
-          disabled: false,
-          profile: {
-            name: profile.name,
-            ...(profile.username ? { username: profile.username } : {}),
-            additionalEmails: profile.additionalEmails || [],
-            notifications: profile.notifications,
-            permissions: profile.permissions,
-            ...(profile.studentMeta ? { studentMeta: profile.studentMeta } : {}),
-            updatedFromUI: true,
-          },
-        });
-        finalUid = res?.data?.uid || finalUid;
+      // Always call the admin upsert so edits without password changes still persist role/permissions.
+      const res = await callAdminUpsert({
+        uid: finalUid, // may be undefined for new
+        email: profile.email,
+        password: password || undefined, // required when creating
+        role,
+        displayName: profile.name,
+        group: null,
+        disabled: false,
+        profile: {
+          name: profile.name,
+          ...(profile.username ? { username: profile.username } : {}),
+          additionalEmails: profile.additionalEmails || [],
+          notifications: profile.notifications,
+          permissions: profile.permissions,
+          ...(profile.studentMeta ? { studentMeta: profile.studentMeta } : {}),
+          updatedFromUI: true,
+        },
+      });
+      finalUid = res?.data?.uid || finalUid;
 
-        if (!finalUid) {
-          throw new Error("No UID returned from function.");
-        }
+      if (!finalUid) {
+        throw new Error("No UID returned from function.");
       }
 
       // Admin callable already writes the profile; avoid a second client write that may be blocked by rules.
@@ -418,12 +470,11 @@ const UserModal = ({ onClose, user, isEditing, onUserSaved }) => {
                   },
                 }}
               >
-                <MenuItem value="theatre_staff">Theatre Staff</MenuItem>
-                <MenuItem value="actor_support_staff">Actor Support Staff</MenuItem>
-                <MenuItem value="actor">Actor</MenuItem>
-                <MenuItem value="pas_staff">PAS Staff</MenuItem>
-                <MenuItem value="pas_support">PAS Support</MenuItem>
-                <MenuItem value="student">Student</MenuItem>
+                {allowedRoleOptions.map((opt) => (
+                  <MenuItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </MenuItem>
+                ))}
               </MDInput>
             </Field>
           </Row>
@@ -463,7 +514,7 @@ const UserModal = ({ onClose, user, isEditing, onUserSaved }) => {
           <Row>
             <Field>
               <MDInput
-                type="password"
+                type={showPassword ? "text" : "password"}
                 label="Password"
                 required={!isEditing}
                 value={password}
@@ -473,11 +524,26 @@ const UserModal = ({ onClose, user, isEditing, onUserSaved }) => {
                 fullWidth
                 size="small"
                 variant="outlined"
+                sx={{ backgroundImage: "none" }}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        aria-label="Toggle password visibility"
+                        onClick={() => setShowPassword((prev) => !prev)}
+                        edge="end"
+                        size="small"
+                      >
+                        {showPassword ? <VisibilityOff /> : <Visibility />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
               />
             </Field>
             <Field>
               <MDInput
-                type="password"
+                type={showConfirmPassword ? "text" : "password"}
                 label="Confirm Password"
                 required={!isEditing}
                 value={confirm}
@@ -486,6 +552,21 @@ const UserModal = ({ onClose, user, isEditing, onUserSaved }) => {
                 fullWidth
                 size="small"
                 variant="outlined"
+                sx={{ backgroundImage: "none" }}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        aria-label="Toggle confirm password visibility"
+                        onClick={() => setShowConfirmPassword((prev) => !prev)}
+                        edge="end"
+                        size="small"
+                      >
+                        {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
               />
             </Field>
           </Row>
@@ -541,23 +622,43 @@ const UserModal = ({ onClose, user, isEditing, onUserSaved }) => {
                 variant="button"
                 sx={{ mt: 2, mb: 1, display: "block", fontWeight: "bold" }}
               >
-                Permissions — Users
+                User Management — Actors
               </MDTypography>
               <ToggleRow
                 label="Read"
-                checked={usersRead}
-                onChange={setUsersRead}
+                checked={userActorsRead}
+                onChange={setUserActorsRead}
                 disabled={permsDisabled}
               />
               <ToggleRow
                 label="Write"
-                checked={usersWrite}
-                onChange={setUsersWrite}
-                disabled={permsDisabled || !usersRead}
+                checked={userActorsWrite}
+                onChange={setUserActorsWrite}
+                disabled={permsDisabled || !userActorsRead}
+              />
+
+              <MDTypography
+                variant="button"
+                sx={{ mt: 2, mb: 1, display: "block", fontWeight: "bold" }}
+              >
+                User Management — Students
+              </MDTypography>
+              <ToggleRow
+                label="Read"
+                checked={userStudentsRead}
+                onChange={setUserStudentsRead}
+                disabled={permsDisabled}
+              />
+              <ToggleRow
+                label="Write"
+                checked={userStudentsWrite}
+                onChange={setUserStudentsWrite}
+                disabled={permsDisabled || !userStudentsRead}
               />
             </>
           )}
 
+          {/* Notifications (temporarily hidden; restore when ready)
           <MDTypography
             variant="button"
             sx={{ mt: 2, mb: 1, display: "block", fontWeight: "bold" }}
@@ -566,6 +667,7 @@ const UserModal = ({ onClose, user, isEditing, onUserSaved }) => {
           </MDTypography>
           <ToggleRow label="Email alerts" checked={notifyEmail} onChange={setNotifyEmail} />
           <ToggleRow label="Push notifications" checked={notifyPush} onChange={setNotifyPush} />
+          */}
 
           {role === "student" && (
             <>

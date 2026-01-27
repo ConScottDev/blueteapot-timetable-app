@@ -164,13 +164,15 @@ const CalendarToolbar = ({
   const hideNavigation = view === "print";
   const isMonthOnlyView = availableViews.length === 1 && availableViews.includes("month");
   const showInlineMobileMonthLabel = isMobileToolbar && view === "month" && isMonthOnlyView;
+  const showMobileNavigationSpacing = isMobileToolbar && view === "month";
   const showYearSelect =
     canSelectStudentYear &&
     typeof onStudentYearChange === "function" &&
     Number.isFinite(selectedYear);
+  const showSeparatedMobileSelectors = isMobileToolbar && showYearSelect && options.length > 1;
 
   const selectorButtonSx = {
-    minWidth: 120,
+    minWidth: { xs: 108, sm: 120 },
     justifyContent: "space-between",
     px: { xs: 1.25, sm: 2 },
     height: { xs: 36, sm: "auto" },
@@ -195,22 +197,26 @@ const CalendarToolbar = ({
         sx={{
           flex: showInlineMobileMonthLabel ? "1 1 100%" : undefined,
           minWidth: showInlineMobileMonthLabel ? 0 : undefined,
+          width: showMobileNavigationSpacing ? "100%" : undefined,
+          justifyContent: showMobileNavigationSpacing ? "space-between" : undefined,
         }}
       >
-        <MDButton
-          size="small"
-          variant="outlined"
-          color="dark"
-          onClick={() => onNavigate("TODAY")}
-          sx={{
-            px: { xs: 1.25, sm: 2 },
-            height: { xs: 36, sm: "auto" },
-          }}
-        >
-          Today
-        </MDButton>
         {!hideNavigation && (
-          <>
+          <MDButton
+            size="small"
+            variant="outlined"
+            color="dark"
+            onClick={() => onNavigate("TODAY")}
+            sx={{
+              px: { xs: 1.25, sm: 2 },
+              height: { xs: 36, sm: "auto" },
+            }}
+          >
+            Today
+          </MDButton>
+        )}
+        {!hideNavigation && (
+          <MDBox display="flex" alignItems="center" gap={0.5} sx={{ ml: "auto" }}>
             <IconButton
               size="small"
               aria-label="Previous period"
@@ -221,7 +227,7 @@ const CalendarToolbar = ({
             <IconButton size="small" aria-label="Next period" onClick={() => onNavigate("NEXT")}>
               <ChevronRightIcon fontSize="small" />
             </IconButton>
-          </>
+          </MDBox>
         )}
         {(!isMobileToolbar || showInlineMobileMonthLabel) && (
           <MDBox
@@ -242,12 +248,15 @@ const CalendarToolbar = ({
         <MDBox
           display="flex"
           alignItems="center"
-          flexWrap="wrap"
-          gap={1}
+          flexWrap={showSeparatedMobileSelectors ? "nowrap" : "wrap"}
+          gap={{ xs: 0.75, sm: 1 }}
           sx={{
-            ml: { xs: "auto", md: 0 },
+            width: showSeparatedMobileSelectors ? "100%" : "auto",
+            flex: showSeparatedMobileSelectors ? "1 1 100%" : "0 0 auto",
+            ml: { xs: showSeparatedMobileSelectors ? 0 : "auto", sm: 0 },
             mt: { xs: 0, sm: 0 },
-            justifyContent: "flex-end",
+            justifyContent: showSeparatedMobileSelectors ? "space-between" : "flex-end",
+            flexShrink: showSeparatedMobileSelectors ? 1 : 0,
           }}
         >
           {showYearSelect && (
@@ -290,7 +299,7 @@ const CalendarToolbar = ({
                 size="small"
                 variant="outlined"
                 color="dark"
-                sx={{ ...selectorButtonSx, ml: { xs: "auto", sm: 0 } }}
+                sx={{ ...selectorButtonSx }}
                 onClick={handleMenuOpen}
                 endIcon={<ArrowDropDownIcon />}
               >
@@ -818,7 +827,7 @@ export default function ScheduleCore({
                 </MDBox>
               ) : (
                 <>
-                  <MDBox pt={1} pb={2} px={{ xs: 2, md: 2 }}>
+                  <MDBox pt={2} pb={2} px={{ xs: 2, md: 2 }}>
                     {!readOnly && (
                       <MDBox
                         sx={({ breakpoints }) => ({
@@ -901,13 +910,14 @@ export default function ScheduleCore({
                         </MDBox>
                       </MDBox>
                     )}
-                    <div
+                    <MDBox
                       id="calendar-capture"
                       className={
                         currentView === "production" ? "production-calendar-active" : undefined
                       }
                     >
                       <Calendar
+                        className="main-calendar"
                         localizer={localizer}
                         events={events}
                         startAccessor="start"
@@ -938,12 +948,14 @@ export default function ScheduleCore({
                         popup
                         eventPropGetter={eventPropGetter}
                       />
-                    </div>
+                    </MDBox>
 
                     {isEventModalOpen && selectedEvent && (
                       <EventModal
                         event={selectedEvent}
                         actors={actors}
+                        students={students}
+                        participantMap={participantMap}
                         scheduleStrand={strand}
                         canEdit={isEditable}
                         showParticipants={!readOnly}

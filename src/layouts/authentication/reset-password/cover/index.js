@@ -13,6 +13,7 @@ Coded by www.creative-tim.com
 * The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 */
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { sendPasswordResetEmail } from "firebase/auth";
 import { auth } from "utils/firebase";
 // @mui material components
@@ -40,6 +41,7 @@ function Cover() {
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
+  const navigate = useNavigate();
 
   async function onSubmit(e) {
     e.preventDefault();
@@ -66,9 +68,9 @@ function Cover() {
       <Card>
         <MDBox
           variant="gradient"
-          bgColor="info"
+          bgColor="primary"
           borderRadius="lg"
-          coloredShadow="success"
+          coloredShadow="primary"
           mx={2}
           mt={-3}
           py={2}
@@ -115,12 +117,23 @@ function Cover() {
             <MDBox mt={6} mb={1}>
               <MDButton
                 variant="gradient"
-                color="info"
+                color="primary"
                 fullWidth
                 type="submit"
                 disabled={submitting}
               >
                 {submitting ? "Sending…" : "Send reset link"}
+              </MDButton>
+            </MDBox>
+            <MDBox mt={2}>
+              <MDButton
+                variant="text"
+                color="primary"
+                fullWidth
+                type="button"
+                onClick={() => navigate("/authentication/sign-in")}
+              >
+                Back to sign in
               </MDButton>
             </MDBox>
           </MDBox>
