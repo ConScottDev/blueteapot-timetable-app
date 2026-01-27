@@ -1,6 +1,6 @@
 {
   "name": "blue-teapot-scheduling",
-  "version": "2.3.13",
+  "version": "2.3.14",
   "private": true,
   "homepage": "./",
   "author": "Conor Scott",
@@ -54,6 +54,7 @@
     "@capacitor/cli": "^6.2.1",
     "@capacitor/core": "^7.4.4",
     "@capacitor/ios": "^7.4.4",
+    "@capacitor/push-notifications": "^7.0.4",
     "@date-io/dayjs": "^3.0.0",
     "@emotion/cache": "11.10.8",
     "@emotion/react": "^11.10.8",
