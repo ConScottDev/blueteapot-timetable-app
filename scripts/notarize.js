@@ -7,6 +7,11 @@ function run(cmd, args, opts = {}) {
   return execFileSync(cmd, args, { encoding: "utf8", ...opts });
 }
 
+function runInherit(cmd, args) {
+  console.log(`\n$ ${cmd} ${args.join(" ")}`);
+  execFileSync(cmd, args, { stdio: "inherit" });
+}
+
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
@@ -19,42 +24,16 @@ function safeJsonParse(s) {
   }
 }
 
-// Best-effort detection of transient network/outage errors from notarytool output
-function isTransientNotaryError(err) {
+function isProbablyNetworkError(err) {
   const msg = String(err?.message || err || "");
-  // -1009 "offline" is the one you hit; these are common transient flavors
   return (
     msg.includes("NSURLErrorDomain") ||
-    msg.includes("Code=-1009") ||
-    msg.includes("offline") ||
+    msg.includes("The Internet connection appears to be offline") ||
     msg.includes("timed out") ||
     msg.includes("ECONNRESET") ||
-    msg.includes("EAI_AGAIN") ||
     msg.includes("ENOTFOUND") ||
-    msg.includes("502") ||
-    msg.includes("503") ||
-    msg.includes("504")
+    msg.includes("EAI_AGAIN")
   );
-}
-
-async function withRetries(fn, { attempts = 5, baseDelayMs = 5000, label = "operation" } = {}) {
-  let lastErr;
-  for (let i = 1; i <= attempts; i++) {
-    try {
-      if (i > 1) console.log(`Retrying ${label} (${i}/${attempts})...`);
-      return await fn();
-    } catch (e) {
-      lastErr = e;
-      const transient = isTransientNotaryError(e);
-      console.warn(`${label} failed (${i}/${attempts}). transient=${transient}`);
-      console.warn(String(e?.message || e));
-
-      if (!transient) break;
-      const delay = baseDelayMs * Math.pow(2, i - 1); // exponential backoff
-      await sleep(Math.min(delay, 120000)); // cap at 2 minutes
-    }
-  }
-  throw lastErr;
 }
 
 exports.default = async function notarizing(context) {
@@ -67,102 +46,85 @@ exports.default = async function notarizing(context) {
 
   const { APPLE_ID, APPLE_TEAM_ID, APPLE_APP_SPECIFIC_PASSWORD } = process.env;
   if (!APPLE_ID || !APPLE_TEAM_ID || !APPLE_APP_SPECIFIC_PASSWORD) {
-    console.warn("Skipping notarization: missing APPLE_ID / APPLE_TEAM_ID / APPLE_APP_SPECIFIC_PASSWORD");
+    console.warn(
+      "Skipping notarization: missing APPLE_ID / APPLE_TEAM_ID / APPLE_APP_SPECIFIC_PASSWORD"
+    );
     return;
   }
 
   console.log("Notarizing app at:", appPath);
 
-  // Re-zip every time to avoid stale zips
-  await withRetries(
-    async () => {
-      run("rm", ["-f", zipPath], { stdio: "inherit" });
-      run("ditto", ["-c", "-k", "--keepParent", appPath, zipPath], { stdio: "inherit" });
-    },
-    { attempts: 3, baseDelayMs: 2000, label: "zip app (ditto)" }
-  );
+  // Recreate zip (avoid stale zip from previous run)
+  runInherit("rm", ["-f", zipPath]);
+  runInherit("ditto", ["-c", "-k", "--keepParent", appPath, zipPath]);
 
-  // Store credentials (safe to run repeatedly)
-  await withRetries(
-    async () => {
-      run(
-        "xcrun",
-        [
-          "notarytool",
-          "store-credentials",
-          "AC_NOTARY",
-          "--apple-id",
-          APPLE_ID,
-          "--team-id",
-          APPLE_TEAM_ID,
-          "--password",
-          APPLE_APP_SPECIFIC_PASSWORD,
-        ],
-        { stdio: "inherit" }
-      );
-    },
-    { attempts: 3, baseDelayMs: 5000, label: "store notary credentials" }
-  );
+  // Store credentials (idempotent — OK to run every time)
+  runInherit("xcrun", [
+    "notarytool",
+    "store-credentials",
+    "AC_NOTARY",
+    "--apple-id",
+    APPLE_ID,
+    "--team-id",
+    APPLE_TEAM_ID,
+    "--password",
+    APPLE_APP_SPECIFIC_PASSWORD,
+  ]);
 
-  // Submit WITHOUT --wait (avoid long hangs + better control over retry)
-  const submitJson = await withRetries(
-    async () => {
-      const out = run("xcrun", [
+  // Submit WITHOUT --wait (we handle waiting ourselves to survive network hiccups)
+  const submitOut = run("xcrun", [
+    "notarytool",
+    "submit",
+    zipPath,
+    "--keychain-profile",
+    "AC_NOTARY",
+    "--output-format",
+    "json",
+  ]);
+
+  const submitJson = safeJsonParse(submitOut);
+  const id = submitJson?.id;
+  if (!id) {
+    console.error("Could not parse submit response:\n", submitOut);
+    throw new Error("Notary submit did not return an id");
+  }
+
+  console.log("Submitted notarization id:", id);
+
+  // Polling strategy:
+  // - 75 polls
+  // - 60s interval => ~75 minutes max
+  // - tolerates transient network errors (doesn't reset the timer)
+  const maxPolls = Number(process.env.NOTARY_MAX_POLLS || 75);
+  const intervalMs = Number(process.env.NOTARY_POLL_INTERVAL_MS || 60000);
+
+  let accepted = false;
+
+  for (let i = 1; i <= maxPolls; i++) {
+    console.log(`Polling notarization status (${i}/${maxPolls})...`);
+
+    let infoOut = "";
+    try {
+      infoOut = run("xcrun", [
         "notarytool",
-        "submit",
-        zipPath,
+        "info",
+        id,
         "--keychain-profile",
         "AC_NOTARY",
         "--output-format",
         "json",
       ]);
-      const j = safeJsonParse(out);
-      if (!j?.id) {
-        console.error("Could not parse submit response:\n", out);
-        throw new Error("Notary submit did not return an id");
+    } catch (e) {
+      if (isProbablyNetworkError(e)) {
+        console.warn("notarytool info failed (network hiccup; will retry):", e?.message || e);
+        await sleep(intervalMs);
+        continue;
       }
-      return j;
-    },
-    { attempts: 5, baseDelayMs: 5000, label: "notarytool submit" }
-  );
+      throw e;
+    }
 
-  const id = submitJson.id;
-  console.log("Submitted notarization id:", id);
-
-  // Poll up to ~70 minutes with backoff:
-  // - first 10 polls: every 30s (5 min)
-  // - next 20 polls: every 60s (20 min)
-  // - remaining 45 polls: every 90s (67.5 min total worst-case)
-  const maxPolls = 75;
-  let accepted = false;
-  let lastStatus = null;
-
-  for (let i = 1; i <= maxPolls; i++) {
-    console.log(`Polling notarization status (${i}/${maxPolls})...`);
-
-    const infoJson = await withRetries(
-      async () => {
-        const out = run("xcrun", [
-          "notarytool",
-          "info",
-          id,
-          "--keychain-profile",
-          "AC_NOTARY",
-          "--output-format",
-          "json",
-        ]);
-        const j = safeJsonParse(out);
-        if (!j) {
-          // rare, but don't crash on non-json; treat as transient
-          throw new Error(`Could not parse notarytool info JSON: ${out.slice(0, 500)}`);
-        }
-        return j;
-      },
-      { attempts: 6, baseDelayMs: 5000, label: "notarytool info" }
-    );
-
-    const status = infoJson.status;
-    lastStatus = status;
+    const infoJson = safeJsonParse(infoOut);
+    const status = infoJson?.status;
     console.log("Notary status:", status);
 
     if (status === "Accepted") {
@@ -174,50 +136,36 @@ exports.default = async function notarizing(context) {
     if (status === "Invalid") {
       console.error("❌ Notarization Invalid. Fetching log...");
       try {
-        const logOut = run("xcrun", ["notarytool", "log", id, "--keychain-profile", "AC_NOTARY"]);
+        const logOut = run("xcrun", [
+          "notarytool",
+          "log",
+          id,
+          "--keychain-profile",
+          "AC_NOTARY",
+        ]);
         console.error("\nNotarytool log:\n", logOut);
       } catch (e) {
-        console.error("Failed to fetch notarytool log:", String(e?.message || e));
+        console.error("Failed to fetch notarytool log:", e?.message || e);
       }
-      throw new Error("Notarization failed (Invalid)");
+      throw new Error(`Notarization failed (Invalid). Submission id: ${id}`);
     }
 
-    // Choose delay with backoff schedule
-    let delayMs = 30000; // default 30s
-    if (i > 10 && i <= 30) delayMs = 60000;
-    if (i > 30) delayMs = 90000;
-
-    await sleep(delayMs);
+    // In Progress / Submitted / etc.
+    await sleep(intervalMs);
   }
 
+  // IMPORTANT: do NOT staple unless Accepted
   if (!accepted) {
-    console.error(
-      `❌ Notarization did not reach Accepted after ${maxPolls} polls. Last status=${lastStatus}`
+    throw new Error(
+      `Notarization did not finish within the polling window (still not Accepted/Invalid). ` +
+        `Submission id: ${id}. You can inspect it later with: ` +
+        `xcrun notarytool info ${id} --keychain-profile AC_NOTARY --output-format json`
     );
-    // Best-effort log fetch (may not exist yet if still "In Progress")
-    try {
-      const logOut = run("xcrun", ["notarytool", "log", id, "--keychain-profile", "AC_NOTARY"]);
-      console.error("\nNotarytool log:\n", logOut);
-    } catch (e) {
-      console.error("Log not available yet:", String(e?.message || e));
-    }
-    throw new Error("Notarization timed out");
   }
 
-  // Staple + validate (with retries for occasional stapler flakiness)
-  await withRetries(
-    async () => {
-      run("xcrun", ["stapler", "staple", "-v", appPath], { stdio: "inherit" });
-    },
-    { attempts: 5, baseDelayMs: 5000, label: "stapler staple" }
-  );
-
-  await withRetries(
-    async () => {
-      run("xcrun", ["stapler", "validate", "-v", appPath], { stdio: "inherit" });
-    },
-    { attempts: 3, baseDelayMs: 3000, label: "stapler validate" }
-  );
+  // Staple + validate
+  runInherit("xcrun", ["stapler", "staple", "-v", appPath]);
+  runInherit("xcrun", ["stapler", "validate", "-v", appPath]);
 
   console.log("\n✅ Notarization accepted and ticket stapled.");
 };
