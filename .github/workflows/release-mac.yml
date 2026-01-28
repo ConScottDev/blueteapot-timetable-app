@@ -41,24 +41,48 @@ jobs:
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
-
       - name: Build and publish DMG
+        id: buildmac
+        continue-on-error: true
         run: npm run build:desktop:publish
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Optional signing/notarization secrets to add in GitHub repo settings.
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
-      - name: Verify Gatekeeper on DMG-installed app
+      - name: Notarytool log (on failure)
+        if: steps.buildmac.outcome != 'success'
         shell: bash
         run: |
           set -e
-          ls -ლა dist || true
-          DMG_PATH="$(find dist -name '*.dmg' -maxdepth 2 | head -n 1)"
+          echo "Fetching most recent notary submission log..."
+          ID="$(xcrun notarytool history --keychain-profile AC_NOTARY --output-format json | \
+            python3 -c "import sys,json; h=json.load(sys.stdin).get('history',[]); print(h[0]['id'] if h else '')")"
+          echo "Latest ID: $ID"
+          test -n "$ID"
+          xcrun notarytool log "$ID" --keychain-profile AC_NOTARY
+
+      - name: Codesign verify (on failure)
+        if: steps.buildmac.outcome != 'success'
+        shell: bash
+        run: |
+          set -e
+          APP_PATH="$(find dist -maxdepth 4 -name '*.app' | head -n 1)"
+          echo "Verifying: $APP_PATH"
+          test -d "$APP_PATH" || exit 0
+          codesign --verify --deep --strict --verbose=4 "$APP_PATH" || true
+          spctl --assess --type execute --verbose=4 "$APP_PATH" || true
+
+      - name: Verify Gatekeeper on DMG-installed app
+        if: steps.buildmac.outcome == 'success'
+        shell: bash
+        run: |
+          set -e
+          ls -la dist || true
+          DMG_PATH="$(find dist -maxdepth 2 -name '*.dmg' | head -n 1)"
           echo "DMG: $DMG_PATH"
           test -f "$DMG_PATH"
 
@@ -69,7 +93,6 @@ jobs:
           echo "App in DMG: $APP_PATH"
           test -d "$APP_PATH"
 
-          # Copy out (Gatekeeper assessment works better off the mounted volume)
           TMP_APP="$(mktemp -d)/$(basename "$APP_PATH")"
           ditto "$APP_PATH" "$TMP_APP"
 
@@ -79,6 +102,9 @@ jobs:
           spctl --assess --type execute --verbose=4 "$TMP_APP"
           xcrun stapler validate -v "$TMP_APP" || true
 
+      - name: Fail if build failed
+        if: steps.buildmac.outcome != 'success'
+        run: exit 1
 
   release-win:
     runs-on: windows-latest
