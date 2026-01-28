@@ -52,6 +52,17 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Verify notarization (Gatekeeper)
+        shell: bash
+        run: |
+          set -e
+          ls -la dist
+          # adjust path/name to the .app in your dist output if needed
+          APP_PATH="$(find dist -name '*.app' -maxdepth 3 | head -n 1)"
+          echo "Assessing: $APP_PATH"
+          spctl --assess --type execute --verbose=4 "$APP_PATH"
+
   release-win:
     runs-on: windows-latest
     steps:
