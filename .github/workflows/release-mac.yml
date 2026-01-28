@@ -53,17 +53,18 @@ jobs:
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
-      - name: Notarytool log (on failure)
+    - name: Notarytool log (on failure)
         if: steps.buildmac.outcome != 'success'
         shell: bash
         run: |
-          set -e
+          set +e
           echo "Fetching most recent notary submission log..."
           ID="$(xcrun notarytool history --keychain-profile AC_NOTARY --output-format json | \
             python3 -c "import sys,json; h=json.load(sys.stdin).get('history',[]); print(h[0]['id'] if h else '')")"
           echo "Latest ID: $ID"
-          test -n "$ID"
-          xcrun notarytool log "$ID" --keychain-profile AC_NOTARY
+          if [ -n "$ID" ]; then
+            xcrun notarytool log "$ID" --keychain-profile AC_NOTARY || true
+          fi
 
       - name: Codesign verify (on failure)
         if: steps.buildmac.outcome != 'success'
