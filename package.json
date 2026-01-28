@@ -1,6 +1,6 @@
 {
   "name": "blue-teapot-scheduling",
-  "version": "2.3.29",
+  "version": "2.3.30",
   "private": true,
   "homepage": "./",
   "author": "Conor Scott",
@@ -30,7 +30,10 @@
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "entitlements": "buildResources/entitlements.mac.plist",
-      "entitlementsInherit": "buildResources/entitlements.mac.plist"
+      "entitlementsInherit": "buildResources/entitlements.mac.plist",
+      "notarize": {
+    "teamId": "DGH98F52J5"
+  }
       
     },
     "win": {
@@ -48,9 +51,7 @@
         "owner": "ConScottDev",
         "repo": "blueteapot-timetable-app"
       }
-    ],
-    "afterSign": "scripts/notarize.js"
-
+    ]
   },
   "dependencies": {
     "@capacitor/android": "^7.4.4",
