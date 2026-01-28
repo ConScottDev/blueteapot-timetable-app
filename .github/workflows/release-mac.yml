@@ -24,6 +24,26 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Sanity check secrets are present
+        shell: bash
+        run: |
+          set -e
+          for v in APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID CSC_LINK CSC_KEY_PASSWORD GH_TOKEN; do
+            if [ -z "${!v}" ]; then
+              echo "::error::$v is missing/empty"
+              exit 1
+            else
+              echo "$v is set"
+            fi
+          done
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+
       - name: Notarytool auth check
         shell: bash
         run: |
@@ -32,7 +52,6 @@ jobs:
             --apple-id "$APPLE_ID" \
             --team-id "$APPLE_TEAM_ID" \
             --password "$APPLE_APP_SPECIFIC_PASSWORD"
-
           xcrun notarytool history \
             --keychain-profile "AC_NOTARY" \
             --output-format json
@@ -53,7 +72,7 @@ jobs:
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
-    - name: Notarytool log (on failure)
+      - name: Notarytool log (on failure)
         if: steps.buildmac.outcome != 'success'
         shell: bash
         run: |
@@ -110,7 +129,6 @@ jobs:
           set -e
           BIN="dist/mac-arm64/Blue Teapot Schedule.app/Contents/Frameworks/Blue Teapot Schedule Helper.app/Contents/MacOS/Blue Teapot Schedule Helper"
           codesign -dv --verbose=4 "$BIN" 2>&1 | egrep "Runtime Version|flags|Identifier|TeamIdentifier" || true
-
 
       - name: Fail if build failed
         if: steps.buildmac.outcome != 'success'
