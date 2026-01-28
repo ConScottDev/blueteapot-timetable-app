@@ -27,6 +27,7 @@ commit.sh
 
 # electron / builder outputs
 /dist
+*.zip
 /out
 /release
 *.exe
