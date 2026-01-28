@@ -60,10 +60,23 @@ jobs:
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
-      - name: Build and publish DMG
+      - name: Build and publish DMG (with heartbeat)
         id: buildmac
         continue-on-error: true
-        run: npm run build:desktop:publish
+        shell: bash
+        run: |
+          set -e
+
+          ( while true; do
+              echo "---- heartbeat $(date -u) ----"
+              ps aux | egrep "codesign|productbuild|xcode|notarytool|electron-builder|ditto|hdiutil" || true
+              sleep 30
+            done ) &
+          HB_PID=$!
+
+          npm run build:desktop:publish
+
+          kill $HB_PID || true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_LINK: ${{ secrets.CSC_LINK }}
@@ -71,6 +84,21 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: List app bundle contents (for signing debug)
+        if: always()
+        shell: bash
+        run: |
+          set -e
+          APP="dist/mac-arm64/Blue Teapot Schedule.app"
+          if [ -d "$APP" ]; then
+            echo "Top-level Frameworks:"
+            find "$APP/Contents/Frameworks" -maxdepth 2 -name "*.app" -o -name "*.framework" | head -n 200
+          else
+            echo "App not found yet."
+          fi
+
+
 
       - name: Notarytool log (on failure)
         if: steps.buildmac.outcome != 'success'
