@@ -53,15 +53,32 @@ jobs:
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
-      - name: Verify notarization (Gatekeeper)
+      - name: Verify Gatekeeper on DMG-installed app
         shell: bash
         run: |
           set -e
-          ls -la dist
-          # adjust path/name to the .app in your dist output if needed
-          APP_PATH="$(find dist -name '*.app' -maxdepth 3 | head -n 1)"
-          echo "Assessing: $APP_PATH"
-          spctl --assess --type execute --verbose=4 "$APP_PATH"
+          ls -ლა dist || true
+          DMG_PATH="$(find dist -name '*.dmg' -maxdepth 2 | head -n 1)"
+          echo "DMG: $DMG_PATH"
+          test -f "$DMG_PATH"
+
+          MOUNT_DIR="$(mktemp -d)"
+          hdiutil attach "$DMG_PATH" -mountpoint "$MOUNT_DIR" -nobrowse -quiet
+
+          APP_PATH="$(find "$MOUNT_DIR" -maxdepth 2 -name '*.app' | head -n 1)"
+          echo "App in DMG: $APP_PATH"
+          test -d "$APP_PATH"
+
+          # Copy out (Gatekeeper assessment works better off the mounted volume)
+          TMP_APP="$(mktemp -d)/$(basename "$APP_PATH")"
+          ditto "$APP_PATH" "$TMP_APP"
+
+          hdiutil detach "$MOUNT_DIR" -quiet
+
+          echo "Assessing extracted app: $TMP_APP"
+          spctl --assess --type execute --verbose=4 "$TMP_APP"
+          xcrun stapler validate -v "$TMP_APP" || true
+
 
   release-win:
     runs-on: windows-latest
