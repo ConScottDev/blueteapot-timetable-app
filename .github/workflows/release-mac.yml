@@ -102,6 +102,15 @@ jobs:
           spctl --assess --type execute --verbose=4 "$TMP_APP"
           xcrun stapler validate -v "$TMP_APP" || true
 
+      - name: Check hardened runtime flags
+        if: steps.buildmac.outcome != 'success'
+        shell: bash
+        run: |
+          set -e
+          BIN="dist/mac-arm64/Blue Teapot Schedule.app/Contents/Frameworks/Blue Teapot Schedule Helper.app/Contents/MacOS/Blue Teapot Schedule Helper"
+          codesign -dv --verbose=4 "$BIN" 2>&1 | egrep "Runtime Version|flags|Identifier|TeamIdentifier" || true
+
+
       - name: Fail if build failed
         if: steps.buildmac.outcome != 'success'
         run: exit 1
