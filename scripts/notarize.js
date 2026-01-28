@@ -7,6 +7,18 @@ function run(cmd, args, opts = {}) {
   return execFileSync(cmd, args, { encoding: "utf8", ...opts });
 }
 
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+function safeJsonParse(s) {
+  try {
+    return JSON.parse(s);
+  } catch {
+    return null;
+  }
+}
+
 exports.default = async function notarizing(context) {
   const { electronPlatformName, appOutDir } = context;
   if (electronPlatformName !== "darwin") return;
@@ -15,7 +27,8 @@ exports.default = async function notarizing(context) {
   const appPath = path.join(appOutDir, `${appName}.app`);
   const zipPath = path.join(appOutDir, `${appName}.zip`);
 
-  if (!process.env.APPLE_ID || !process.env.APPLE_TEAM_ID || !process.env.APPLE_APP_SPECIFIC_PASSWORD) {
+  const { APPLE_ID, APPLE_TEAM_ID, APPLE_APP_SPECIFIC_PASSWORD } = process.env;
+  if (!APPLE_ID || !APPLE_TEAM_ID || !APPLE_APP_SPECIFIC_PASSWORD) {
     console.warn("Skipping notarization: missing APPLE_ID / APPLE_TEAM_ID / APPLE_APP_SPECIFIC_PASSWORD");
     return;
   }
@@ -25,7 +38,7 @@ exports.default = async function notarizing(context) {
   // Zip the .app for notarization
   run("ditto", ["-c", "-k", "--keepParent", appPath, zipPath], { stdio: "inherit" });
 
-  // Store credentials once (profile name AC_NOTARY)
+  // Store credentials (profile name AC_NOTARY)
   run(
     "xcrun",
     [
@@ -33,61 +46,84 @@ exports.default = async function notarizing(context) {
       "store-credentials",
       "AC_NOTARY",
       "--apple-id",
-      process.env.APPLE_ID,
+      APPLE_ID,
       "--team-id",
-      process.env.APPLE_TEAM_ID,
+      APPLE_TEAM_ID,
       "--password",
-      process.env.APPLE_APP_SPECIFIC_PASSWORD,
+      APPLE_APP_SPECIFIC_PASSWORD,
     ],
     { stdio: "inherit" }
   );
 
-  // Submit and WAIT for result (this is the critical part)
+  // Submit WITHOUT --wait
   const submitOut = run("xcrun", [
     "notarytool",
     "submit",
     zipPath,
     "--keychain-profile",
     "AC_NOTARY",
-    "--wait",
     "--output-format",
     "json",
   ]);
 
-  let result;
-  try {
-    result = JSON.parse(submitOut);
-  } catch (e) {
-    console.error("Could not parse notarytool JSON output:\n", submitOut);
-    throw e;
+  const submitJson = safeJsonParse(submitOut);
+  const id = submitJson?.id;
+  if (!id) {
+    console.error("Could not parse submit response:\n", submitOut);
+    throw new Error("Notary submit did not return an id");
   }
 
-  const id = result.id;
-  const status = result.status;
+  console.log("Submitted notarization id:", id);
 
-  console.log("\nNotarytool result:", { id, status });
+  // Poll status up to ~60 minutes, tolerate transient network errors
+  const maxPolls = 120; // 120 * 30s = 60 min
+  for (let i = 1; i <= maxPolls; i++) {
+    console.log(`Polling notarization status (${i}/${maxPolls})...`);
 
-  if (status !== "Accepted") {
-    // Get log for troubleshooting and fail the build
+    let infoOut = "";
     try {
-      const logOut = run("xcrun", [
+      infoOut = run("xcrun", [
         "notarytool",
-        "log",
+        "info",
         id,
         "--keychain-profile",
         "AC_NOTARY",
+        "--output-format",
+        "json",
       ]);
-      console.error("\nNotarytool log:\n", logOut);
     } catch (e) {
-      console.error("Failed to fetch notarytool log.");
+      // network hiccup / temporary Apple outage
+      console.warn("notarytool info failed (will retry):", e?.message || e);
+      await sleep(30000);
+      continue;
     }
-    throw new Error(`Notarization failed (status: ${status})`);
+
+    const infoJson = safeJsonParse(infoOut);
+    const status = infoJson?.status;
+
+    console.log("Notary status:", status);
+
+    if (status === "Accepted") {
+      console.log("✅ Notarization Accepted");
+      break;
+    }
+
+    if (status === "Invalid") {
+      console.error("❌ Notarization Invalid. Fetching log...");
+      try {
+        const logOut = run("xcrun", ["notarytool", "log", id, "--keychain-profile", "AC_NOTARY"]);
+        console.error("\nNotarytool log:\n", logOut);
+      } catch (e) {
+        console.error("Failed to fetch notarytool log:", e?.message || e);
+      }
+      throw new Error("Notarization failed (Invalid)");
+    }
+
+    await sleep(30000);
   }
 
-  // Staple ticket to the .app
+  // Staple + validate
   run("xcrun", ["stapler", "staple", "-v", appPath], { stdio: "inherit" });
-
-  // Optional: validate stapling
   run("xcrun", ["stapler", "validate", "-v", appPath], { stdio: "inherit" });
 
   console.log("\n✅ Notarization accepted and ticket stapled.");

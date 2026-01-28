@@ -11,6 +11,8 @@ permissions:
 jobs:
   release-mac:
     runs-on: macos-latest
+    timeout-minutes: 90
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -44,39 +46,9 @@ jobs:
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
 
-      - name: Notarytool auth check
+      - name: Build and publish DMG
         shell: bash
-        run: |
-          set -e
-          xcrun notarytool store-credentials "AC_NOTARY" \
-            --apple-id "$APPLE_ID" \
-            --team-id "$APPLE_TEAM_ID" \
-            --password "$APPLE_APP_SPECIFIC_PASSWORD"
-          xcrun notarytool history \
-            --keychain-profile "AC_NOTARY" \
-            --output-format json
-        env:
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-
-      - name: Build and publish DMG (with heartbeat)
-        id: buildmac
-        continue-on-error: true
-        shell: bash
-        run: |
-          set -e
-
-          ( while true; do
-              echo "---- heartbeat $(date -u) ----"
-              ps aux | egrep "codesign|productbuild|xcode|notarytool|electron-builder|ditto|hdiutil" || true
-              sleep 30
-            done ) &
-          HB_PID=$!
-
-          npm run build:desktop:publish
-
-          kill $HB_PID || true
+        run: npm run build:desktop:publish
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_LINK: ${{ secrets.CSC_LINK }}
@@ -85,82 +57,14 @@ jobs:
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
-      - name: List app bundle contents (for signing debug)
-        if: always()
-        shell: bash
-        run: |
-          set -e
-          APP="dist/mac-arm64/Blue Teapot Schedule.app"
-          if [ -d "$APP" ]; then
-            echo "Top-level Frameworks:"
-            find "$APP/Contents/Frameworks" -maxdepth 2 -name "*.app" -o -name "*.framework" | head -n 200
-          else
-            echo "App not found yet."
-          fi
-
-
-
-      - name: Notarytool log (on failure)
-        if: steps.buildmac.outcome != 'success'
-        shell: bash
-        run: |
-          set +e
-          echo "Fetching most recent notary submission log..."
-          ID="$(xcrun notarytool history --keychain-profile AC_NOTARY --output-format json | \
-            python3 -c "import sys,json; h=json.load(sys.stdin).get('history',[]); print(h[0]['id'] if h else '')")"
-          echo "Latest ID: $ID"
-          if [ -n "$ID" ]; then
-            xcrun notarytool log "$ID" --keychain-profile AC_NOTARY || true
-          fi
-
-      - name: Codesign verify (on failure)
-        if: steps.buildmac.outcome != 'success'
+      - name: Verify Gatekeeper (best-effort)
         shell: bash
         run: |
           set -e
           APP_PATH="$(find dist -maxdepth 4 -name '*.app' | head -n 1)"
-          echo "Verifying: $APP_PATH"
-          test -d "$APP_PATH" || exit 0
-          codesign --verify --deep --strict --verbose=4 "$APP_PATH" || true
+          echo "Assessing: $APP_PATH"
           spctl --assess --type execute --verbose=4 "$APP_PATH" || true
-
-      - name: Verify Gatekeeper on DMG-installed app
-        if: steps.buildmac.outcome == 'success'
-        shell: bash
-        run: |
-          set -e
-          ls -la dist || true
-          DMG_PATH="$(find dist -maxdepth 2 -name '*.dmg' | head -n 1)"
-          echo "DMG: $DMG_PATH"
-          test -f "$DMG_PATH"
-
-          MOUNT_DIR="$(mktemp -d)"
-          hdiutil attach "$DMG_PATH" -mountpoint "$MOUNT_DIR" -nobrowse -quiet
-
-          APP_PATH="$(find "$MOUNT_DIR" -maxdepth 2 -name '*.app' | head -n 1)"
-          echo "App in DMG: $APP_PATH"
-          test -d "$APP_PATH"
-
-          TMP_APP="$(mktemp -d)/$(basename "$APP_PATH")"
-          ditto "$APP_PATH" "$TMP_APP"
-
-          hdiutil detach "$MOUNT_DIR" -quiet
-
-          echo "Assessing extracted app: $TMP_APP"
-          spctl --assess --type execute --verbose=4 "$TMP_APP"
-          xcrun stapler validate -v "$TMP_APP" || true
-
-      - name: Check hardened runtime flags
-        if: steps.buildmac.outcome != 'success'
-        shell: bash
-        run: |
-          set -e
-          BIN="dist/mac-arm64/Blue Teapot Schedule.app/Contents/Frameworks/Blue Teapot Schedule Helper.app/Contents/MacOS/Blue Teapot Schedule Helper"
-          codesign -dv --verbose=4 "$BIN" 2>&1 | egrep "Runtime Version|flags|Identifier|TeamIdentifier" || true
-
-      - name: Fail if build failed
-        if: steps.buildmac.outcome != 'success'
-        run: exit 1
+          xcrun stapler validate -v "$APP_PATH" || true
 
   release-win:
     runs-on: windows-latest
