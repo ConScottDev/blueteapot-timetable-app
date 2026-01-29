@@ -92,8 +92,10 @@ function initAutoUpdater() {
     // dialog.showMessageBox(...).then(() => autoUpdater.quitAndInstall());
   });
 
-  // This triggers the check:
+setTimeout(() => {
   autoUpdater.checkForUpdatesAndNotify();
+}, 3000);
+
 }
 
 app.whenReady().then(() => {
