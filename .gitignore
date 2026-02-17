@@ -38,3 +38,14 @@ commit.sh
 *.asar
 latest*.yml
 builder-debug.yml
+
+# Capacitor / mobile generated
+ios/
+android/
+resources/
+
+# Common generated assets folder (only ignore if it's generated)
+assets/
+
+# Backups
+*.bak
