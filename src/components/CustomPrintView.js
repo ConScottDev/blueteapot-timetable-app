@@ -290,7 +290,7 @@ class CustomPrintView extends React.Component {
             />
           </LocalizationProvider>
           <MDTypography className="title" fontSize="16px">
-            {localizer.format(start, "DD/MM/yyyy")} - {localizer.format(end, "DD/MM/yyyy")}
+            {localizer.format(start, "DD/MM/YYYY")} - {localizer.format(end, "DD/MM/YYYY")}
           </MDTypography>
           <TextField
             className="pages-input"

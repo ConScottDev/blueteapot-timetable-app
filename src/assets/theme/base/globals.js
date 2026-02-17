@@ -26,6 +26,17 @@ const globals = {
     margin: 0,
     padding: 0,
   },
+  body: {
+    boxSizing: "border-box",
+    paddingTop: "env(safe-area-inset-top)",
+    paddingRight: "env(safe-area-inset-right)",
+    paddingBottom: "env(safe-area-inset-bottom)",
+    paddingLeft: "env(safe-area-inset-left)",
+  },
+  "#app": {
+    minHeight: "calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom))",
+    boxSizing: "border-box",
+  },
   "a, a:link, a:visited": {
     textDecoration: "none !important",
   },

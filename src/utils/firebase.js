@@ -1,7 +1,7 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
-import { getAuth } from "firebase/auth";
+import { initializeAuth, indexedDBLocalPersistence } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getFunctions, httpsCallable } from "firebase/functions";
 
@@ -26,7 +26,10 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
-const auth = getAuth(app); // Initialize Firebase Authentication
+const auth = initializeAuth(app, {
+  persistence: indexedDBLocalPersistence,
+  popupRedirectResolver: undefined, // disable gapi/popup flows in Capacitor
+});
 const db = getFirestore(app);
 export const functions = getFunctions(app, "europe-west1"); // match your region
 export const callAdminUpsert = httpsCallable(functions, "adminUpsertAuthUserWithPassword");
