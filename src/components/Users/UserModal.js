@@ -238,12 +238,7 @@ const UserModal = ({ onClose, user, isEditing, onUserSaved }) => {
 
   const [passwordError, setPasswordError] = useState("");
   useEffect(() => {
-    // For edits, leaving both fields empty means "no password change"
-    if (isEditing && !password && !confirm) {
-      setPasswordError("");
-      return;
-    }
-
+    // Password always required for both create and edit
     if (!password && !confirm) {
       setPasswordError("");
       return;
@@ -262,7 +257,7 @@ const UserModal = ({ onClose, user, isEditing, onUserSaved }) => {
     }
 
     setPasswordError("");
-  }, [password, confirm, isEditing]);
+  }, [password, confirm]);
 
   const handleUsernameInputChange = (value) => {
     setUsername(value);
@@ -281,6 +276,7 @@ const UserModal = ({ onClose, user, isEditing, onUserSaved }) => {
     setUsernameManuallyEdited(value !== generated);
   };
   const passwordInvalidOnCreate = !isEditing && (!!passwordError || !password || !confirm);
+  const passwordInvalidOnEdit = isEditing && (!!passwordError || !password || !confirm);
   const displayError = formError || passwordError;
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -305,32 +301,18 @@ const UserModal = ({ onClose, user, isEditing, onUserSaved }) => {
       return setFormError("Username is required for actors and students.");
     }
 
-    // New user must have password + confirm (match, length)
-    if (isCreating) {
-      if (!password || !confirm) {
-        setPasswordError("Password and Confirm Password are required.");
-        return setFormError("Password and Confirm Password are required.");
-      }
-      if (password !== confirm) {
-        setPasswordError("Passwords do not match.");
-        return setFormError("Passwords do not match.");
-      }
-      if (password.length < 6) {
-        setPasswordError("Password must be at least 6 characters.");
-        return setFormError("Password must be at least 6 characters.");
-      }
+    // Password + confirm required for both create and edit
+    if (!password || !confirm) {
+      setPasswordError("Password and Confirm Password are required.");
+      return setFormError("Password and Confirm Password are required.");
     }
-
-    // If a password is provided, confirm must match and length check
-    if (password) {
-      if (password !== confirm) {
-        setPasswordError("Passwords do not match.");
-        return setFormError("Passwords do not match.");
-      }
-      if (password.length < 6) {
-        setPasswordError("Password must be at least 6 characters.");
-        return setFormError("Password must be at least 6 characters.");
-      }
+    if (password !== confirm) {
+      setPasswordError("Passwords do not match.");
+      return setFormError("Passwords do not match.");
+    }
+    if (password.length < 6) {
+      setPasswordError("Password must be at least 6 characters.");
+      return setFormError("Password must be at least 6 characters.");
     }
     // --------------------------
 
@@ -516,11 +498,11 @@ const UserModal = ({ onClose, user, isEditing, onUserSaved }) => {
               <MDInput
                 type={showPassword ? "text" : "password"}
                 label="Password"
-                required={!isEditing}
+                required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 error={!!passwordError}
-                placeholder={isEditing ? "Leave blank to keep current" : "Minimum 6 characters"}
+                placeholder="Minimum 6 characters"
                 fullWidth
                 size="small"
                 variant="outlined"
@@ -545,7 +527,7 @@ const UserModal = ({ onClose, user, isEditing, onUserSaved }) => {
               <MDInput
                 type={showConfirmPassword ? "text" : "password"}
                 label="Confirm Password"
-                required={!isEditing}
+                required
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
                 error={!!passwordError}
@@ -751,7 +733,7 @@ const UserModal = ({ onClose, user, isEditing, onUserSaved }) => {
               variant="contained"
               color="info"
               size="small"
-              disabled={passwordInvalidOnCreate}
+              disabled={passwordInvalidOnCreate || passwordInvalidOnEdit}
             >
               {isEditing ? "Save Changes" : "Add User"}
             </MDButton>

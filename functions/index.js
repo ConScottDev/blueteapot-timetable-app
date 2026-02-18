@@ -648,3 +648,34 @@ exports.adminDeleteUser = onCall(async (request) => {
 
   return { ok: true };
 });
+
+// Public callable used by the web app to resolve a username to an email for sign-in.
+// We keep it simple and read from Firestore with admin privileges to avoid exposing
+// wider read access in security rules. Errors are deliberately generic to avoid
+// leaking whether a username exists during brute-force attempts.
+exports.lookupEmailByUsername = onCall(async (request) => {
+  const username = (request.data && request.data.username) || "";
+  if (typeof username !== "string" || !username.trim()) {
+    throw new HttpsError("invalid-argument", "username is required");
+  }
+
+  const db = getFirestore();
+  const trimmed = username.trim();
+  const snap = await db
+    .collection("users")
+    .where("username", "==", trimmed)
+    .limit(1)
+    .get();
+
+  if (snap.empty) {
+    throw new HttpsError("not-found", "Username not found");
+  }
+
+  const data = snap.docs[0].data() || {};
+  const email = data.email;
+  if (!email) {
+    throw new HttpsError("failed-precondition", "Username missing email");
+  }
+
+  return { email };
+});

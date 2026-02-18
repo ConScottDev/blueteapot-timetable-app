@@ -217,6 +217,11 @@ const AddTaskModal = ({ onClose, scheduleStrand }) => {
     return merged;
   }, [actors, actorSupport, pasSupport, scheduleStrand, students]);
 
+  const allParticipantIds = useMemo(
+    () => participantOptions.map((p) => p.id),
+    [participantOptions]
+  );
+
   const participantsById = useMemo(
     () => Object.fromEntries(participantOptions.map((p) => [p.id, p])),
     [participantOptions]
@@ -384,6 +389,17 @@ const AddTaskModal = ({ onClose, scheduleStrand }) => {
     } = event;
     setParticipants(typeof value === "string" ? value.split(",") : value);
   };
+
+  const handleSelectAllParticipants = useCallback(() => {
+    setParticipants((prev) => {
+      const allSelected =
+        allParticipantIds.length > 0 && allParticipantIds.every((id) => prev.includes(id));
+      return allSelected ? [] : allParticipantIds;
+    });
+  }, [allParticipantIds]);
+
+  const allParticipantsSelected =
+    participantOptions.length > 0 && participants.length === participantOptions.length;
 
   const handlePresetTimeChange = (event) => {
     const selectedTime = event.target.value;
@@ -712,6 +728,16 @@ const AddTaskModal = ({ onClose, scheduleStrand }) => {
               </FormField>
             </TimePickerContainer>
             <FormField>
+              <Box display="flex" justifyContent="flex-end" sx={{ mb: 0.5 }}>
+                <Button
+                  size="small"
+                  variant="text"
+                  onClick={handleSelectAllParticipants}
+                  disabled={participantOptions.length === 0}
+                >
+                  {allParticipantsSelected ? "Clear" : "Select all"}
+                </Button>
+              </Box>
               <FormControl fullWidth>
                 <InputLabel id="participants-label">Participants</InputLabel>
                 <Select

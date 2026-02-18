@@ -13,7 +13,7 @@ import {
   sendPasswordResetEmail,
 } from "firebase/auth";
 
-import { auth } from "utils/firebase"; // <-- adjust if your path differs
+import { auth, callLookupEmailByUsername } from "utils/firebase"; // <-- adjust if your path differs
 import { useAuth } from "auth/AuthProvider"; // <-- from the provider we added
 
 // @mui
@@ -36,7 +36,7 @@ import bgImage from "assets/images/bg-sign-in-basic.jpeg";
 import brandWhite from "assets/images/blue-teapot-white.png";
 
 function SignIn() {
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState(""); // email or username
   const [pw, setPw] = useState("");
   const [rememberMe, setRememberMe] = useState(() => {
     // Persist remember choice so desktop/native wrappers keep it across reloads
@@ -63,6 +63,18 @@ function SignIn() {
     localStorage.setItem("bt_remember_me", rememberMe ? "true" : "false");
   }, [rememberMe]);
 
+  // Resolve a login identifier (email or username) to an email Firebase Auth accepts.
+  async function resolveEmailFromIdentifier(rawInput) {
+    const trimmed = rawInput.trim();
+    if (trimmed.includes("@")) return trimmed;
+
+    // Call backend to resolve without relaxing Firestore rules.
+    const { data } = await callLookupEmailByUsername({ username: trimmed });
+    if (data?.email) return data.email;
+
+    throw new Error("username-not-found");
+  }
+
   async function onSubmit(e) {
     e.preventDefault();
     setErr("");
@@ -79,7 +91,8 @@ function SignIn() {
       } catch (pErr) {
         console.warn("Persistence selection failed, continuing with default:", pErr);
       }
-      await signInWithEmailAndPassword(auth, email.trim(), pw);
+      const emailToUse = await resolveEmailFromIdentifier(identifier);
+      await signInWithEmailAndPassword(auth, emailToUse, pw);
       // navigation now handled by redirect once user state updates
     } catch (e) {
       const code = e?.code || "";
@@ -89,6 +102,10 @@ function SignIn() {
         friendly = "Email or password is incorrect.";
       else if (code === "auth/too-many-requests")
         friendly = "Too many attempts. Please try again later.";
+      else if (code === "functions/not-found" || e?.message === "username-not-found")
+        friendly = "Username not found.";
+      else if (code === "functions/invalid-argument")
+        friendly = "Please enter your email or username.";
       setErr(friendly);
     } finally {
       setSubmitting(false);
@@ -127,11 +144,11 @@ function SignIn() {
           <MDBox component="form" role="form" onSubmit={onSubmit}>
             <MDBox mb={2}>
               <MDInput
-                type="email"
-                label="Email"
+                type="text"
+                label="Email or Username"
                 fullWidth
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
                 autoComplete="username"
               />
             </MDBox>

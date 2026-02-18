@@ -34,6 +34,7 @@ const db = getFirestore(app);
 export const functions = getFunctions(app, "europe-west1"); // match your region
 export const callAdminUpsert = httpsCallable(functions, "adminUpsertAuthUserWithPassword");
 export const callAdminDeleteUser = httpsCallable(functions, "adminDeleteUser"); // <-- add this
+export const callLookupEmailByUsername = httpsCallable(functions, "lookupEmailByUsername");
 
 // Export the auth object for use in other parts of your application
 export { auth, db };
