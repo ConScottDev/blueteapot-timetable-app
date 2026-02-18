@@ -92,10 +92,9 @@ function initAutoUpdater() {
     // dialog.showMessageBox(...).then(() => autoUpdater.quitAndInstall());
   });
 
-setTimeout(() => {
-  autoUpdater.checkForUpdatesAndNotify();
-}, 3000);
-
+  setTimeout(() => {
+    autoUpdater.checkForUpdatesAndNotify();
+  }, 3000);
 }
 
 app.whenReady().then(() => {
