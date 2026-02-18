@@ -48,3 +48,5 @@ android/.idea/
 
 # (optional) if you never want this tracked
 functions/package-lock.json
+
+functions/.env
