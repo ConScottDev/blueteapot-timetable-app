@@ -72,14 +72,16 @@ const ColorCircle = styled.div`
 
 const ModalOverlay = styled.div`
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   background: rgba(0, 0, 0, 0.5);
   display: flex;
   justify-content: center;
   align-items: center;
+  padding: calc(16px + var(--sat)) calc(16px + var(--sar)) calc(16px + var(--sab))
+    calc(16px + var(--sal));
+  overflow-y: auto;
+  box-sizing: border-box;
+  -webkit-overflow-scrolling: touch;
   z-index: 1000;
 `;
 
@@ -87,11 +89,12 @@ const ModalContainer = styled.div`
   background: white;
   padding: 20px;
   border-radius: 8px;
-  width: 400px;
+  width: min(400px, 100%);
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
   position: relative;
-  max-height: 100vh; /* Set maximum height to 80% of viewport height */
-  overflow-y: auto; /* Add vertical scrollbar if content overflows */
+  max-height: calc(var(--app-shell-min-height) - var(--sat) - var(--sab) - 32px);
+  overflow-y: auto;
+  box-sizing: border-box;
 `;
 
 const CloseButton = styled.button`

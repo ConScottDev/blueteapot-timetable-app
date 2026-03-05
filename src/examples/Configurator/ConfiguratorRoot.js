@@ -48,7 +48,8 @@ export default styled(Drawer)(({ theme, ownerState }) => {
 
   return {
     "& .MuiDrawer-paper": {
-      height: "100vh",
+      top: "var(--sat)",
+      height: "calc(var(--app-shell-min-height) - var(--sat) - var(--sab))",
       margin: 0,
       padding: `0 ${pxToRem(10)}`,
       borderRadius: 0,

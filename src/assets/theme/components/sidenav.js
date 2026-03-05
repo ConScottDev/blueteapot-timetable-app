@@ -34,7 +34,10 @@ const sidenav = {
     paper: {
       width: pxToRem(250),
       backgroundColor: white.main,
-      height: `calc(100vh - ${pxToRem(32)})`,
+      height: `calc(
+        var(--app-shell-min-height) - var(--sat) - var(--sab) - ${pxToRem(32)}
+      )`,
+      top: "var(--sat)",
       margin: pxToRem(16),
       borderRadius: borderRadius.xl,
       border: "none",

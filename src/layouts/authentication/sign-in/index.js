@@ -141,7 +141,7 @@ function SignIn() {
         </MDBox>
 
         <MDBox pt={4} pb={3} px={3}>
-          <MDBox component="form" role="form" onSubmit={onSubmit}>
+          <MDBox component="form" role="form" className="ios-no-zoom" onSubmit={onSubmit}>
             <MDBox mb={2}>
               <MDInput
                 type="text"

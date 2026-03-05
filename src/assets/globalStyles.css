@@ -1,4 +1,81 @@
 /* globalStyles.css */
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --app-shell-min-height: 100vh;
+}
+
+@supports (min-height: 100dvh) {
+  :root {
+    --app-shell-min-height: 100dvh;
+  }
+}
+
+html {
+  height: 100%;
+  width: 100%;
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  min-height: 100%;
+  width: 100%;
+  margin: 0;
+  overflow-x: hidden;
+}
+
+#app {
+  width: 100%;
+  max-width: 100%;
+  min-height: var(--app-shell-min-height);
+  overflow-x: hidden;
+}
+
+.app-shell {
+  min-height: var(--app-shell-min-height);
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 100%;
+}
+
+.app-safe-area {
+  min-height: var(--app-shell-min-height);
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  padding-right: var(--sar);
+  padding-bottom: var(--sab);
+  padding-left: var(--sal);
+  box-sizing: border-box;
+}
+
+.app-main {
+  min-height: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.ios-no-zoom input,
+.ios-no-zoom textarea,
+.ios-no-zoom select,
+.ios-no-zoom button,
+.ios-no-zoom .MuiInputBase-input,
+.ios-no-zoom .MuiSelect-select,
+input,
+textarea,
+select {
+  font-size: 16px !important;
+}
+
+.app-scroll-lock {
+  overflow: hidden;
+}
+
 .css-o0cc1y-MuiButtonBase-root-MuiMenuItem-root-MuiMultiSectionDigitalClockSection-item {
   min-width: 2rem !important;
 }

@@ -21,6 +21,7 @@ const { info, dark } = colors;
 const globals = {
   html: {
     scrollBehavior: "smooth",
+    WebkitTextSizeAdjust: "100%",
   },
   "*, *::before, *::after": {
     margin: 0,
@@ -28,13 +29,11 @@ const globals = {
   },
   body: {
     boxSizing: "border-box",
-    paddingTop: "env(safe-area-inset-top)",
-    paddingRight: "env(safe-area-inset-right)",
-    paddingBottom: "env(safe-area-inset-bottom)",
-    paddingLeft: "env(safe-area-inset-left)",
+    overflowX: "hidden",
   },
   "#app": {
-    minHeight: "calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom))",
+    minHeight: "var(--app-shell-min-height)",
+    width: "100%",
     boxSizing: "border-box",
   },
   "a, a:link, a:visited": {

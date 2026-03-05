@@ -26,6 +26,7 @@ const select = {
     select: {
       display: "grid",
       alignItems: "center",
+      fontSize: pxToRem(16),
       padding: `0 ${pxToRem(12)} !important`,
 
       "& .Mui-selected": {

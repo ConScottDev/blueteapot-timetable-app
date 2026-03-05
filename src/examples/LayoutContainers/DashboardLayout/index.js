@@ -41,6 +41,10 @@ function DashboardLayout({ children }) {
       sx={({ breakpoints, transitions, functions: { pxToRem } }) => ({
         p: 3,
         position: "relative",
+        minHeight: "var(--app-shell-min-height)",
+        display: "flex",
+        flexDirection: "column",
+        minWidth: 0,
 
         [breakpoints.down("sm")]: {
           p: 2,

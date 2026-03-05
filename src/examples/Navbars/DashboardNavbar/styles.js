@@ -42,12 +42,12 @@ function navbar(theme, ownerState) {
 
       return color;
     },
-    top: absolute ? "env(safe-area-inset-top)" : pxToRem(12),
+    top: absolute ? 0 : pxToRem(12),
     minHeight: pxToRem(75),
     display: "grid",
     alignItems: "center",
     borderRadius: borderRadius.xl,
-    paddingTop: pxToRem(8),
+    paddingTop: `calc(${pxToRem(8)} + var(--sat))`,
     paddingBottom: pxToRem(8),
     paddingRight: absolute ? pxToRem(8) : 0,
     paddingLeft: absolute ? pxToRem(16) : 0,

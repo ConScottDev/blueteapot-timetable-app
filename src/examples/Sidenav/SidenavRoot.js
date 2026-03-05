@@ -25,14 +25,6 @@ export default styled(Drawer)(({ theme, ownerState }) => {
   const { transparent, gradients, white, background } = palette;
   const { xxl } = boxShadows;
   const { pxToRem, linearGradient } = functions;
-  const iPhoneSafeAreaStyles = {
-    "@supports (-webkit-touch-callout: none)": {
-      "@media (max-width: 430px) and (pointer: coarse)": {
-        top: "env(safe-area-inset-top)",
-        height: "calc(100% - env(safe-area-inset-top))",
-      },
-    },
-  };
 
   let backgroundValue = darkMode
     ? background.sidenav
@@ -93,7 +85,16 @@ export default styled(Drawer)(({ theme, ownerState }) => {
     "& .MuiDrawer-paper": {
       boxShadow: xxl,
       border: "none",
-      ...iPhoneSafeAreaStyles,
+      [breakpoints.down("xl")]: {
+        top: "var(--sat)",
+        left: 0,
+        height: "calc(var(--app-shell-min-height) - var(--sat))",
+        maxHeight: "calc(var(--app-shell-min-height) - var(--sat))",
+        margin: 0,
+        borderRadius: 0,
+        paddingBottom: "var(--sab)",
+        boxSizing: "border-box",
+      },
 
       ...(miniSidenav ? drawerCloseStyles() : drawerOpenStyles()),
     },

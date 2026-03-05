@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
 const config: CapacitorConfig = {
-  appId: "ie.blueteapot.schedule",
+  appId: "ie.blueteapot.schedule.app",
   appName: "Blue Teapot",
   webDir: "build",
   server: {

@@ -30,7 +30,7 @@ const inputOutlined = {
   styleOverrides: {
     root: {
       backgroundColor: transparent.main,
-      fontSize: size.sm,
+      fontSize: pxToRem(16),
       borderRadius: borderRadius.md,
 
       "&:hover .MuiOutlinedInput-notchedOutline": {
@@ -49,6 +49,7 @@ const inputOutlined = {
     },
 
     input: {
+      fontSize: pxToRem(16),
       color: white.main,
       padding: pxToRem(12),
       backgroundColor: transparent.main,
@@ -59,7 +60,7 @@ const inputOutlined = {
     },
 
     inputSizeSmall: {
-      fontSize: size.xs,
+      fontSize: pxToRem(16),
       padding: pxToRem(10),
     },
 

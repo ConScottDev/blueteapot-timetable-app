@@ -52,16 +52,22 @@ const ModalOverlay = styled.div`
   display: flex;
   justify-content: center;
   align-items: center;
+  padding: calc(16px + var(--sat)) calc(16px + var(--sar)) calc(16px + var(--sab))
+    calc(16px + var(--sal));
+  overflow-y: auto;
+  box-sizing: border-box;
+  -webkit-overflow-scrolling: touch;
   z-index: 1000;
 `;
 const ModalContainer = styled.div`
   background: #fff;
   padding: 20px;
   border-radius: 8px;
-  width: 520px;
-  max-height: 100vh;
+  width: min(520px, 100%);
+  max-height: calc(var(--app-shell-min-height) - var(--sat) - var(--sab) - 32px);
   overflow-y: auto;
   position: relative;
+  box-sizing: border-box;
 `;
 const CloseButton = styled.button`
   background: none;

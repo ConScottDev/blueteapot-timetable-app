@@ -143,25 +143,31 @@ function AppShell() {
     <ActorProvider>
       <ThemeProvider theme={darkMode ? themeDark : theme}>
         <CssBaseline />
-        {showDashboardShell && (
-          <>
-            <Sidenav
-              color={sidenavColor}
-              brand={(transparentSidenav && !darkMode) || whiteSidenav ? brandDark : brandWhite}
-              brandName={brandTitle}
-              routes={routes}
-              onMouseEnter={handleOnMouseEnter}
-              onMouseLeave={handleOnMouseLeave}
-            />
-            <Configurator />
-            {/* {configsButton} */}
-          </>
-        )}
-        {layout === "vr" && <Configurator />}
-        <Routes>
-          {getRoutes(routes)}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        <MDBox className="app-shell">
+          <MDBox className="app-safe-area">
+            {showDashboardShell && (
+              <>
+                <Sidenav
+                  color={sidenavColor}
+                  brand={(transparentSidenav && !darkMode) || whiteSidenav ? brandDark : brandWhite}
+                  brandName={brandTitle}
+                  routes={routes}
+                  onMouseEnter={handleOnMouseEnter}
+                  onMouseLeave={handleOnMouseLeave}
+                />
+                <Configurator />
+                {/* {configsButton} */}
+              </>
+            )}
+            {layout === "vr" && <Configurator />}
+            <MDBox component="main" className="app-main">
+              <Routes>
+                {getRoutes(routes)}
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </MDBox>
+          </MDBox>
+        </MDBox>
       </ThemeProvider>
     </ActorProvider>
   );

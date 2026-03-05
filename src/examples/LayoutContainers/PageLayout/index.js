@@ -37,11 +37,15 @@ function PageLayout({ background, children }) {
 
   return (
     <MDBox
-      width="100vw"
-      height="100%"
-      minHeight="100vh"
+      width="100%"
+      minHeight="var(--app-shell-min-height)"
       bgColor={background}
-      sx={{ overflowX: "hidden" }}
+      sx={{
+        overflowX: "hidden",
+        display: "flex",
+        flexDirection: "column",
+        flex: 1,
+      }}
     >
       {children}
     </MDBox>
