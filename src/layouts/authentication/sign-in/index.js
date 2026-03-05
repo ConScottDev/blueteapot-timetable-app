@@ -10,6 +10,7 @@ import {
   setPersistence,
   browserLocalPersistence,
   browserSessionPersistence,
+  inMemoryPersistence,
   sendPasswordResetEmail,
 } from "firebase/auth";
 
@@ -35,14 +36,47 @@ import BasicLayout from "layouts/authentication/components/BasicLayout";
 import bgImage from "assets/images/bg-sign-in-basic.jpeg";
 import brandWhite from "assets/images/blue-teapot-white.png";
 
+const REMEMBER_PREF_KEY = "bt_remember_me";
+
+function readRememberPreference() {
+  try {
+    const stored = localStorage.getItem(REMEMBER_PREF_KEY);
+    return stored === "false" ? false : true;
+  } catch (_err) {
+    return true;
+  }
+}
+
+function persistRememberPreference(remember) {
+  try {
+    localStorage.setItem(REMEMBER_PREF_KEY, remember ? "true" : "false");
+  } catch (_err) {
+    // Ignore storage errors in restricted webview contexts.
+  }
+}
+
+async function applyPersistenceForRemember(remember) {
+  const candidates = remember
+    ? [browserLocalPersistence, browserSessionPersistence, inMemoryPersistence]
+    : [browserSessionPersistence, inMemoryPersistence];
+
+  let lastError = null;
+  for (const persistence of candidates) {
+    try {
+      await setPersistence(auth, persistence);
+      return;
+    } catch (err) {
+      lastError = err;
+    }
+  }
+
+  if (lastError) throw lastError;
+}
+
 function SignIn() {
   const [identifier, setIdentifier] = useState(""); // email or username
   const [pw, setPw] = useState("");
-  const [rememberMe, setRememberMe] = useState(() => {
-    // Persist remember choice so desktop/native wrappers keep it across reloads
-    const stored = localStorage.getItem("bt_remember_me");
-    return stored === "false" ? false : true;
-  });
+  const [rememberMe, setRememberMe] = useState(readRememberPreference);
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState(""); // success/info messages
   const [err, setErr] = useState(""); // error messages
@@ -60,7 +94,7 @@ function SignIn() {
   const handleSetRememberMe = () => setRememberMe((v) => !v);
   // Save preference whenever it changes
   useEffect(() => {
-    localStorage.setItem("bt_remember_me", rememberMe ? "true" : "false");
+    persistRememberPreference(rememberMe);
   }, [rememberMe]);
 
   // Resolve a login identifier (email or username) to an email Firebase Auth accepts.
@@ -81,16 +115,8 @@ function SignIn() {
     setMsg("");
     setSubmitting(true);
     try {
-      // Remember me = persist in local storage; otherwise session only.
-      // If not supported (e.g., some native/webview contexts), fall back to default persistence.
-      try {
-        await setPersistence(
-          auth,
-          rememberMe ? browserLocalPersistence : browserSessionPersistence
-        );
-      } catch (pErr) {
-        console.warn("Persistence selection failed, continuing with default:", pErr);
-      }
+      // Apply persistence using a fallback chain for mobile webviews and Electron.
+      await applyPersistenceForRemember(rememberMe);
       const emailToUse = await resolveEmailFromIdentifier(identifier);
       await signInWithEmailAndPassword(auth, emailToUse, pw);
       // navigation now handled by redirect once user state updates
