@@ -1,7 +1,12 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
-import { initializeAuth, indexedDBLocalPersistence } from "firebase/auth";
+import {
+  initializeAuth,
+  indexedDBLocalPersistence,
+  browserLocalPersistence,
+  browserSessionPersistence,
+} from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getFunctions, httpsCallable } from "firebase/functions";
 
@@ -27,7 +32,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
 const auth = initializeAuth(app, {
-  persistence: indexedDBLocalPersistence,
+  persistence: [indexedDBLocalPersistence, browserLocalPersistence, browserSessionPersistence],
   popupRedirectResolver: undefined, // disable gapi/popup flows in Capacitor
 });
 const db = getFirestore(app);

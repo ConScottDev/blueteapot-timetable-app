@@ -71,6 +71,7 @@ class CustomPrintView extends React.Component {
     this.reactToPrintRef = null; // to trigger ReactToPrint programmatically
     this._bgRows = [];
     this._pendingSelection = [];
+    this.autoPrintTimer = null;
   }
 
   openExportMenu = (e) => this.setState({ exportAnchorEl: e.currentTarget });
@@ -80,6 +81,13 @@ class CustomPrintView extends React.Component {
     this.closeExportMenu();
     // Trigger ReactToPrint’s print
     if (this.reactToPrintRef?.handlePrint) this.reactToPrintRef.handlePrint();
+  };
+
+  handleAfterPrint = () => {
+    const { autoPrintOnMount, onSimplePrintComplete } = this.props;
+    if (autoPrintOnMount && typeof onSimplePrintComplete === "function") {
+      onSimplePrintComplete();
+    }
   };
 
   exportPNG = async () => {
@@ -145,6 +153,12 @@ class CustomPrintView extends React.Component {
 
     if (this.state.needLimitMeasure) this.measureRowLimit(this.props);
 
+    if (this.props.autoPrintOnMount) {
+      this.autoPrintTimer = window.setTimeout(() => {
+        this.handlePrint();
+      }, 250);
+    }
+
     window.addEventListener(
       "resize",
       (this._resizeListener = () => {
@@ -164,6 +178,9 @@ class CustomPrintView extends React.Component {
   }
 
   componentWillUnmount() {
+    if (this.autoPrintTimer) {
+      window.clearTimeout(this.autoPrintTimer);
+    }
     window.removeEventListener("resize", this._resizeListener, false);
   }
 
@@ -247,7 +264,7 @@ class CustomPrintView extends React.Component {
   }
 
   render() {
-    const { className, localizer } = this.props;
+    const { className, localizer, simplifiedPrintActions } = this.props;
     const { selectedDate, numberOfPages } = this.state;
 
     if (!selectedDate) {
@@ -313,53 +330,66 @@ class CustomPrintView extends React.Component {
             }
           />
 
-          <IconButton
-            className="export-button"
-            onClick={this.openExportMenu}
-            aria-label="Export options"
-          >
-            <MoreVertIcon />
-          </IconButton>
-          <Menu
-            anchorEl={this.state.exportAnchorEl}
-            open={Boolean(this.state.exportAnchorEl)}
-            onClose={this.closeExportMenu}
-            anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
-            transformOrigin={{ vertical: "top", horizontal: "left" }}
-          >
-            <NotificationItem
-              icon={
-                <Icon>
-                  <PrintIcon />
-                </Icon>
-              }
-              title="Print"
+          {simplifiedPrintActions ? (
+            <IconButton
+              className="export-button"
               onClick={this.handlePrint}
-            />
-            <NotificationItem
-              icon={
-                <Icon>
-                  <ImageIcon />
-                </Icon>
-              }
-              title="Export PNG"
-              onClick={this.exportPNG}
-            />
-            <NotificationItem
-              icon={
-                <Icon>
-                  <PictureAsPdfIcon />
-                </Icon>
-              }
-              title="Export PDF"
-              onClick={this.exportPDF}
-            />
-          </Menu>
+              aria-label="Print schedule"
+            >
+              <PrintIcon />
+            </IconButton>
+          ) : (
+            <>
+              <IconButton
+                className="export-button"
+                onClick={this.openExportMenu}
+                aria-label="Export options"
+              >
+                <MoreVertIcon />
+              </IconButton>
+              <Menu
+                anchorEl={this.state.exportAnchorEl}
+                open={Boolean(this.state.exportAnchorEl)}
+                onClose={this.closeExportMenu}
+                anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+                transformOrigin={{ vertical: "top", horizontal: "left" }}
+              >
+                <NotificationItem
+                  icon={
+                    <Icon>
+                      <PrintIcon />
+                    </Icon>
+                  }
+                  title="Print"
+                  onClick={this.handlePrint}
+                />
+                <NotificationItem
+                  icon={
+                    <Icon>
+                      <ImageIcon />
+                    </Icon>
+                  }
+                  title="Export PNG"
+                  onClick={this.exportPNG}
+                />
+                <NotificationItem
+                  icon={
+                    <Icon>
+                      <PictureAsPdfIcon />
+                    </Icon>
+                  }
+                  title="Export PDF"
+                  onClick={this.exportPDF}
+                />
+              </Menu>
+            </>
+          )}
           {/* ReactToPrint instance (hidden trigger; we call it programmatically) */}
           <ReactToPrint
             ref={(el) => (this.reactToPrintRef = el)}
             trigger={() => <span style={{ display: "none" }} />}
             content={() => this.printRef.current}
+            onAfterPrint={this.handleAfterPrint}
           />
         </div>
 
@@ -824,6 +854,9 @@ CustomPrintView.propTypes = {
       y: PropTypes.number,
     }),
   ]),
+  autoPrintOnMount: PropTypes.bool,
+  onSimplePrintComplete: PropTypes.func,
+  simplifiedPrintActions: PropTypes.bool,
 };
 
 CustomPrintView.range = (date, { localizer }) => {

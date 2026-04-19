@@ -27,6 +27,7 @@ import AddIcon from "@mui/icons-material/Add";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import PrintIcon from "@mui/icons-material/Print";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFnsV3";
 import { useActor } from "context/ActorProvider";
@@ -128,6 +129,8 @@ const CalendarToolbar = ({
   canSelectStudentYear = false,
   selectedYear,
   onStudentYearChange,
+  useSimplePrintControls = false,
+  onSimplePrintRequest,
 }) => {
   const isMobileToolbar = useMediaQuery("(max-width:600px)");
   const availableViews = useMemo(() => {
@@ -170,6 +173,8 @@ const CalendarToolbar = ({
     typeof onStudentYearChange === "function" &&
     Number.isFinite(selectedYear);
   const showSeparatedMobileSelectors = isMobileToolbar && showYearSelect && options.length > 1;
+  const showSimplePrintButton =
+    useSimplePrintControls && availableViews.includes("print") && typeof onView === "function";
 
   const selectorButtonSx = {
     minWidth: { xs: 108, sm: 120 },
@@ -293,7 +298,36 @@ const CalendarToolbar = ({
               </Menu>
             </>
           )}
-          {options.length > 1 && (
+          {showSimplePrintButton && (
+            <IconButton
+              onClick={() => {
+                if (typeof onSimplePrintRequest === "function") {
+                  onSimplePrintRequest();
+                }
+                onView("print");
+              }}
+              aria-label="Print schedule"
+              sx={{
+                width: { xs: 52, sm: 60 },
+                height: { xs: 52, sm: 60 },
+                border: "2px solid #373a3c",
+                borderRadius: "50%",
+                color: "#373a3c",
+                backgroundColor: "#fff",
+                flexShrink: 0,
+                "&:hover": {
+                  backgroundColor: "#f4f6f8",
+                  borderColor: "#1f2933",
+                },
+                "& .MuiSvgIcon-root": {
+                  fontSize: { xs: 30, sm: 34 },
+                },
+              }}
+            >
+              <PrintIcon />
+            </IconButton>
+          )}
+          {options.length > 1 && !showSimplePrintButton && (
             <>
               <MDButton
                 size="small"
@@ -363,10 +397,12 @@ export default function ScheduleCore({
 
   const [selectedParticipants, setSelectedParticipants] = useState([]);
   const [currentView, setCurrentView] = useState(Views.MONTH);
+  const [pendingSimplePrint, setPendingSimplePrint] = useState(false);
   const { selectedActor, setSelectedActor } = useActor();
   const { user } = useAuth();
   const userYear = useMemo(() => deriveYearFromUser(user), [user]);
   const canSelectStudentYear = strand === "student" && !readOnly;
+  const useSimplePrintControls = readOnly;
 
   const includeActors = Boolean(participantsSource?.actors);
   const includeStudents = Boolean(participantsSource?.students);
@@ -673,10 +709,11 @@ export default function ScheduleCore({
       participant?.name ||
       participant?.fullName ||
       participant?.email ||
+      (readOnly && (user?.displayName || user?.name || user?.fullName || user?.email)) ||
       primaryId ||
       "";
     setSelectedActor(displayName);
-  }, [currentView, selectedParticipants, participantMap, setSelectedActor]);
+  }, [currentView, selectedParticipants, participantMap, readOnly, setSelectedActor, user]);
 
   // Filter tasks by selected participants and (if production view) production flag
   const filteredTasks = useMemo(() => {
@@ -775,13 +812,46 @@ export default function ScheduleCore({
   const eventPropGetter = (event) => ({
     style: { backgroundColor: event.color || "#3174ad" },
   });
+  const handleViewChange = useCallback((nextView) => {
+    setCurrentView(nextView);
+    if (nextView !== "print") {
+      setPendingSimplePrint(false);
+    }
+  }, []);
+  const handleSimplePrintRequest = useCallback(() => {
+    setPendingSimplePrint(true);
+  }, []);
+  const handleSimplePrintComplete = useCallback(() => {
+    setPendingSimplePrint(false);
+    setCurrentView(Views.MONTH);
+  }, []);
 
   // Views: restrict read-only users to month view, but expose print/production otherwise
+  const PrintView = useMemo(() => {
+    if (!useSimplePrintControls) return CustomPrintView;
+
+    function SimplePrintView(props) {
+      return (
+        <CustomPrintView
+          {...props}
+          autoPrintOnMount={pendingSimplePrint}
+          onSimplePrintComplete={handleSimplePrintComplete}
+          simplifiedPrintActions
+        />
+      );
+    }
+
+    SimplePrintView.range = CustomPrintView.range;
+    SimplePrintView.navigate = CustomPrintView.navigate;
+    SimplePrintView.title = CustomPrintView.title;
+    return SimplePrintView;
+  }, [handleSimplePrintComplete, pendingSimplePrint, useSimplePrintControls]);
+
   const views = useMemo(() => {
-    const base = readOnly ? { month: true } : { month: true, print: CustomPrintView };
+    const base = { month: true, print: PrintView };
     if (!readOnly && strand === "actor") base.production = ProductionCalendar;
     return base;
-  }, [strand, readOnly]);
+  }, [strand, readOnly, PrintView]);
 
   const defaultView = useMemo(() => {
     return Views.MONTH;
@@ -923,11 +993,12 @@ export default function ScheduleCore({
                         startAccessor="start"
                         endAccessor="end"
                         onSelectEvent={handleEventClick}
+                        view={currentView}
                         views={views}
                         defaultView={defaultView}
                         showAllEvents
                         messages={{ print: "Print", production: "Production" }}
-                        onView={setCurrentView}
+                        onView={handleViewChange}
                         selectable={isEditable}
                         components={{
                           toolbar: (toolbarProps) => (
@@ -936,6 +1007,8 @@ export default function ScheduleCore({
                               canSelectStudentYear={canSelectStudentYear}
                               selectedYear={selectedYear}
                               onStudentYearChange={setSelectedYear}
+                              useSimplePrintControls={useSimplePrintControls}
+                              onSimplePrintRequest={handleSimplePrintRequest}
                             />
                           ),
                           event: (props) => (

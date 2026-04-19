@@ -8,6 +8,7 @@ import { Link, useLocation, Navigate, useNavigate } from "react-router-dom";
 import {
   signInWithEmailAndPassword,
   setPersistence,
+  indexedDBLocalPersistence,
   browserLocalPersistence,
   browserSessionPersistence,
   inMemoryPersistence,
@@ -20,8 +21,13 @@ import { useAuth } from "auth/AuthProvider"; // <-- from the provider we added
 // @mui
 import Card from "@mui/material/Card";
 import Switch from "@mui/material/Switch";
+import FormControlLabel from "@mui/material/FormControlLabel";
 import Grid from "@mui/material/Grid";
 import MuiLink from "@mui/material/Link";
+import IconButton from "@mui/material/IconButton";
+import InputAdornment from "@mui/material/InputAdornment";
+import Visibility from "@mui/icons-material/Visibility";
+import VisibilityOff from "@mui/icons-material/VisibilityOff";
 
 // Material Dashboard components
 import MDBox from "components/MDBox";
@@ -37,6 +43,7 @@ import bgImage from "assets/images/bg-sign-in-basic.jpeg";
 import brandWhite from "assets/images/blue-teapot-white.png";
 
 const REMEMBER_PREF_KEY = "bt_remember_me";
+const REMEMBER_IDENTIFIER_KEY = "bt_remember_identifier";
 
 function readRememberPreference() {
   try {
@@ -55,9 +62,41 @@ function persistRememberPreference(remember) {
   }
 }
 
+function readRememberedIdentifier() {
+  try {
+    return localStorage.getItem(REMEMBER_IDENTIFIER_KEY) || "";
+  } catch (_err) {
+    return "";
+  }
+}
+
+function persistRememberedIdentifier(identifierToRemember) {
+  try {
+    const trimmed = identifierToRemember.trim();
+    if (trimmed) {
+      localStorage.setItem(REMEMBER_IDENTIFIER_KEY, trimmed);
+    }
+  } catch (_err) {
+    // Ignore storage errors in restricted webview contexts.
+  }
+}
+
+function clearRememberedIdentifier() {
+  try {
+    localStorage.removeItem(REMEMBER_IDENTIFIER_KEY);
+  } catch (_err) {
+    // Ignore storage errors in restricted webview contexts.
+  }
+}
+
 async function applyPersistenceForRemember(remember) {
   const candidates = remember
-    ? [browserLocalPersistence, browserSessionPersistence, inMemoryPersistence]
+    ? [
+        indexedDBLocalPersistence,
+        browserLocalPersistence,
+        browserSessionPersistence,
+        inMemoryPersistence,
+      ]
     : [browserSessionPersistence, inMemoryPersistence];
 
   let lastError = null;
@@ -74,8 +113,11 @@ async function applyPersistenceForRemember(remember) {
 }
 
 function SignIn() {
-  const [identifier, setIdentifier] = useState(""); // email or username
+  const [identifier, setIdentifier] = useState(() =>
+    readRememberPreference() ? readRememberedIdentifier() : ""
+  ); // email or username
   const [pw, setPw] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(readRememberPreference);
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState(""); // success/info messages
@@ -91,10 +133,11 @@ function SignIn() {
       : rawFrom && typeof rawFrom === "object"
       ? rawFrom.pathname || "/"
       : "/";
-  const handleSetRememberMe = () => setRememberMe((v) => !v);
+  const handleSetRememberMe = (event) => setRememberMe(event.target.checked);
   // Save preference whenever it changes
   useEffect(() => {
     persistRememberPreference(rememberMe);
+    if (!rememberMe) clearRememberedIdentifier();
   }, [rememberMe]);
 
   // Resolve a login identifier (email or username) to an email Firebase Auth accepts.
@@ -119,6 +162,11 @@ function SignIn() {
       await applyPersistenceForRemember(rememberMe);
       const emailToUse = await resolveEmailFromIdentifier(identifier);
       await signInWithEmailAndPassword(auth, emailToUse, pw);
+      if (rememberMe) {
+        persistRememberedIdentifier(identifier);
+      } else {
+        clearRememberedIdentifier();
+      }
       // navigation now handled by redirect once user state updates
     } catch (e) {
       const code = e?.code || "";
@@ -181,26 +229,52 @@ function SignIn() {
 
             <MDBox mb={1}>
               <MDInput
-                type="password"
+                type={showPassword ? "text" : "password"}
                 label="Password"
                 fullWidth
                 value={pw}
                 onChange={(e) => setPw(e.target.value)}
                 autoComplete="current-password"
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        aria-label={showPassword ? "Hide password" : "Show password"}
+                        onClick={() => setShowPassword((prev) => !prev)}
+                        onMouseDown={(e) => e.preventDefault()}
+                        edge="end"
+                      >
+                        {showPassword ? <VisibilityOff /> : <Visibility />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
               />
             </MDBox>
 
             <MDBox display="flex" alignItems="center" ml={-1} mt={1} mb={1}>
-              <Switch checked={rememberMe} onChange={handleSetRememberMe} />
-              <MDTypography
-                variant="button"
-                fontWeight="regular"
-                color="text"
-                onClick={handleSetRememberMe}
-                sx={{ cursor: "pointer", userSelect: "none", ml: -1 }}
-              >
-                &nbsp;&nbsp;Remember me
-              </MDTypography>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={rememberMe}
+                    onChange={handleSetRememberMe}
+                    inputProps={{ "aria-label": "Remember me" }}
+                  />
+                }
+                label={
+                  <MDTypography variant="button" fontWeight="regular" color="text">
+                    Remember me
+                  </MDTypography>
+                }
+                sx={{
+                  ml: 0,
+                  userSelect: "none",
+                  WebkitTapHighlightColor: "transparent",
+                  "& .MuiFormControlLabel-label": {
+                    lineHeight: 1,
+                  },
+                }}
+              />
             </MDBox>
 
             <MDBox mt={1} mb={2}>
